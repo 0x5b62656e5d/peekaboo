@@ -131,11 +131,13 @@ final class Hider: NSObject {
         let apps = hidden.compactMap { NSRunningApplication.runningApplications(withBundleIdentifier: $0).first }
             .sorted { ($0.localizedName ?? "") < ($1.localizedName ?? "") }
         secondBar = SecondBar(apps: apps, under: item.button?.window?.frame ?? .zero, onPick: { [weak self] in self?.peek($0) }, onDismiss: { [weak self] in self?.closeSecondBar() })
+        updateIcon()
     }
 
     private func closeSecondBar() {
         secondBar?.close()
         secondBar = nil
+        updateIcon()
     }
 
     /// Shows a hidden app's items and presses its item if it has just one. With several there's no
@@ -205,7 +207,8 @@ final class Hider: NSObject {
     }
 
     private func updateIcon() {
-        let symbol = Settings.glyph.symbol(collapsed: isCollapsed)
+        let state: DividerState = secondBar != nil ? .secondBarOpen : isCollapsed ? .collapsed : .expanded
+        let symbol = Settings.glyph.symbol(for: state)
         item.button?.image = NSImage(systemSymbolName: symbol, accessibilityDescription: "peekaboo divider")
     }
 }

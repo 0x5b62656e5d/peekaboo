@@ -12,17 +12,25 @@ enum RevealMode: String, CaseIterable {
     }
 }
 
+enum DividerState {
+    case collapsed, expanded, secondBarOpen
+}
+
 enum DividerGlyph: String, CaseIterable {
     case chevron, dot, diamond, line
 
     var title: String { rawValue.capitalized }
 
-    func symbol(collapsed: Bool) -> String {
-        switch self {
-        case .chevron: collapsed ? "chevron.left" : "chevron.right"
-        case .dot: collapsed ? "circle.fill" : "circle"
-        case .diamond: collapsed ? "diamond.fill" : "diamond"
-        case .line: "poweron"
+    func symbol(for state: DividerState) -> String {
+        switch (self, state) {
+        case (.chevron, .collapsed): "chevron.left"
+        case (.chevron, .expanded): "chevron.right"
+        case (.chevron, .secondBarOpen): "chevron.down"
+        case (.dot, .collapsed): "circle.fill"
+        case (.dot, _): "circle"
+        case (.diamond, .collapsed): "diamond.fill"
+        case (.diamond, _): "diamond"
+        case (.line, _): "poweron"
         }
     }
 }
