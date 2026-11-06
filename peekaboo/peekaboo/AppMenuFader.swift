@@ -37,7 +37,9 @@ final class AppMenuFader: NSObject {
         bars = NSScreen.screens.compactMap { screen in
             let wallpaper = NSWorkspace.shared.desktopImageURL(for: screen)
             if let existing = bars.first(where: { $0.matches(screen, wallpaper: wallpaper) }) { return existing }
-            return ScreenBar(screen: screen, wallpaper: wallpaper) { [weak self] in self?.reveal() }
+            let bar = ScreenBar(screen: screen, wallpaper: wallpaper) { [weak self] in self?.reveal() }
+            bar?.setCoverAlpha(isRevealed ? 0 : 1)
+            return bar
         }
         placeCovers()
     }
@@ -68,7 +70,6 @@ final class AppMenuFader: NSObject {
             } else {
                 bar.uncover()
             }
-            bar.setCoverAlpha(isRevealed ? 0 : 1)
         }
     }
 
@@ -121,8 +122,6 @@ final class AppMenuFader: NSObject {
     }
 
     private func fade(to alpha: CGFloat) {
-        // placeCovers already set the end state for hidden covers, so start from the opposite one.
-        for bar in bars { bar.setCoverAlpha(1 - alpha) }
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Self.fadeDuration
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
