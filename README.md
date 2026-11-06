@@ -2,7 +2,7 @@
 
 A macOS app that makes your menu bar look cleaner. Requires macOS 27.
 
-- Fades the app menus (File, Edit, View...) until the pointer is on the menu bar. The Apple logo and app name stay.
+- Fades the app menus (File, Edit, View...) until the pointer is on the left half of the menu bar. The Apple logo and app name stay.
 - Hides status icons behind a divider. ⌘-drag icons to the left of the divider to hide them, or to the right to keep them visible.
 - Optionally shows hidden icons in a second bar below the menu bar, for when the notch gets in the way.
 

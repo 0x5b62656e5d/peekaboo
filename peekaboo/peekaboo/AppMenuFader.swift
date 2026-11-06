@@ -1,7 +1,7 @@
 import AppKit
 
 /// Fades the frontmost app's menus (File, Edit...) out, keeping the Apple logo and app name, and
-/// back in while the pointer is on the menu bar. macOS has no API to fade only part of the bar,
+/// back in while the pointer is on the left half of the menu bar. macOS has no API to fade only part of the bar,
 /// so a panel showing the matching slice of wallpaper covers the menus.
 final class AppMenuFader: NSObject {
     private static let fadeDuration = 0.4
@@ -118,7 +118,7 @@ final class AppMenuFader: NSObject {
 
     private var isPointerOnBar: Bool {
         let pointer = NSEvent.mouseLocation
-        return bars.contains { $0.containsPointer(pointer) }
+        return bars.contains { $0.isInHoverZone(pointer) }
     }
 
     private func fade(to alpha: CGFloat) {
@@ -131,7 +131,9 @@ final class AppMenuFader: NSObject {
 
     @objc private func menuOpened() {
         isMenuOpen = true
-        reveal()
+        // A status icon's menu shouldn't bring the app menus back, but one opened from the keyboard should.
+        let pointer = NSEvent.mouseLocation
+        if !bars.contains(where: { $0.isOnBarOutsideHoverZone(pointer) }) { reveal() }
     }
 
     @objc private func menuClosed() {
@@ -151,6 +153,8 @@ private final class ScreenBar {
     private let coverPanel: NSPanel
     private let hoverPanel: NSPanel
     private let screenFrame: CGRect
+    private let barRect: CGRect
+    private let hoverZone: CGRect
 
     /// Returns nil when the screen has no visible bar, as with auto-hide or full screen.
     init?(screen: NSScreen, wallpaper: URL?, onHover: @escaping () -> Void) {
@@ -161,7 +165,8 @@ private final class ScreenBar {
         self.barHeight = barHeight
         screenFrame = screen.frame
 
-        let barRect = CGRect(x: screen.frame.minX, y: screen.frame.maxY - barHeight, width: screen.frame.width, height: barHeight)
+        barRect = CGRect(x: screen.frame.minX, y: screen.frame.maxY - barHeight, width: screen.frame.width, height: barHeight)
+        hoverZone = CGRect(x: barRect.minX, y: barRect.minY, width: barRect.width / 2, height: barHeight)
 
         coverPanel = Self.makePanel(frame: barRect, level: .statusBar)
         coverPanel.ignoresMouseEvents = true
@@ -171,7 +176,7 @@ private final class ScreenBar {
         content.layer?.contentsGravity = .resize
         coverPanel.contentView = content
 
-        hoverPanel = Self.makePanel(frame: barRect, level: NSWindow.Level(NSWindow.Level.statusBar.rawValue + 1))
+        hoverPanel = Self.makePanel(frame: hoverZone, level: NSWindow.Level(NSWindow.Level.statusBar.rawValue + 1))
         hoverPanel.isOpaque = false
         hoverPanel.backgroundColor = .clear
         hoverPanel.ignoresMouseEvents = false
@@ -215,8 +220,12 @@ private final class ScreenBar {
         hoverPanel.ignoresMouseEvents = !enabled
     }
 
-    func containsPointer(_ point: CGPoint) -> Bool {
-        point.y >= screenFrame.maxY - barHeight && point.y <= screenFrame.maxY && point.x >= screenFrame.minX && point.x <= screenFrame.maxX
+    func isInHoverZone(_ point: CGPoint) -> Bool {
+        NSPointInRect(point, hoverZone.insetBy(dx: 0, dy: -1))
+    }
+
+    func isOnBarOutsideHoverZone(_ point: CGPoint) -> Bool {
+        NSPointInRect(point, barRect.insetBy(dx: 0, dy: -1)) && !isInHoverZone(point)
     }
 
     private static func makePanel(frame: CGRect, level: NSWindow.Level) -> NSPanel {
