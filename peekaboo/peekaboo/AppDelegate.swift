@@ -2,9 +2,15 @@ import AppKit
 
 @main
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private let hider = Hider()
+
     static func main() {
         let delegate = AppDelegate()
         NSApplication.shared.delegate = delegate
         NSApplication.shared.run()
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        hider.start()
     }
 }
