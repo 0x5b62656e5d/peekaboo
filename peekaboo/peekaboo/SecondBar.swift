@@ -48,9 +48,11 @@ final class SecondBar: NSObject {
         panel.setFrame(CGRect(x: x, y: screen.visibleFrame.maxY - size.height - Self.gapBelowMenuBar, width: size.width, height: size.height), display: true)
         panel.orderFrontRegardless()
 
-        // Clicks on this app's own panels and divider don't reach a global monitor.
+        // MenuBarAgent draws the divider, so its clicks reach this monitor. Leave those to the divider's
+        // own toggle, or mouse-down would close the bar and mouse-up would reopen it.
+        let divider = anchor.insetBy(dx: 0, dy: -1)
         outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            self?.onDismiss()
+            if !divider.contains(NSEvent.mouseLocation) { self?.onDismiss() }
         }
     }
 
