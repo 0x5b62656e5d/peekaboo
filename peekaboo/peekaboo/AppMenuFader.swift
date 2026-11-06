@@ -4,7 +4,7 @@ import AppKit
 /// back in while the pointer is on the menu bar. macOS has no API to fade only part of the bar,
 /// so a panel showing the matching slice of wallpaper covers the menus.
 final class AppMenuFader: NSObject {
-    private static let fadeDuration = 0.2
+    private static let fadeDuration = 0.4
     private static let exitDelay = 0.3
     private static let relaunchReadDelay = 0.5
     private static let menuReadTimeout: Float = 0.2
@@ -125,6 +125,7 @@ final class AppMenuFader: NSObject {
         for bar in bars { bar.setCoverAlpha(1 - alpha) }
         NSAnimationContext.runAnimationGroup { context in
             context.duration = Self.fadeDuration
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             for bar in bars { bar.animateCoverAlpha(alpha) }
         }
     }
