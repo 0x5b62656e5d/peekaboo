@@ -22,7 +22,8 @@ extension AXUIElement {
 
 /// A status item as MenuBarAgent lays it out.
 struct BarItem {
-    let element: AXUIElement
+    /// The item's button in its owner's process, which is what responds to AXPress.
+    let button: AXUIElement
     let owner: pid_t
     let x: CGFloat
 }
@@ -38,10 +39,10 @@ enum MenuBarAgent {
         AXUIElementSetMessagingTimeout(app, timeout)
         guard let window = (app.value(kAXWindowsAttribute) as? [AXUIElement])?.first else { return [] }
         return window.children.compactMap { group in
-            guard let frame = group.frame, let child = group.children.first else { return nil }
+            guard let frame = group.frame, let button = group.children.first else { return nil }
             var owner: pid_t = 0
-            AXUIElementGetPid(child, &owner)
-            return BarItem(element: group, owner: owner, x: frame.minX)
+            AXUIElementGetPid(button, &owner)
+            return BarItem(button: button, owner: owner, x: frame.minX)
         }
     }
 }
