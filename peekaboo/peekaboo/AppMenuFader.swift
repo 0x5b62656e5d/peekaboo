@@ -27,8 +27,13 @@ final class AppMenuFader: NSObject {
         syncAndPlace()
     }
 
+    func settingsChanged() {
+        syncAndPlace()
+    }
+
     /// Reuses each screen's panels unless its wallpaper or geometry changed, since decoding the wallpaper is the one costly step.
     @objc private func syncAndPlace() {
+        guard Settings.fadesAppMenus else { return removeBars() }
         bars = NSScreen.screens.compactMap { screen in
             let wallpaper = NSWorkspace.shared.desktopImageURL(for: screen)
             if let existing = bars.first(where: { $0.matches(screen, wallpaper: wallpaper) }) { return existing }
@@ -44,7 +49,16 @@ final class AppMenuFader: NSObject {
         perform(#selector(placeCovers), with: nil, afterDelay: Self.relaunchReadDelay)
     }
 
+    private func removeBars() {
+        cancelCover()
+        if let exitMonitor { NSEvent.removeMonitor(exitMonitor) }
+        exitMonitor = nil
+        isRevealed = false
+        bars = []
+    }
+
     @objc private func placeCovers() {
+        guard !bars.isEmpty else { return }
         let menus = frontmostMenuSpan()
         let base = menus.flatMap { span in NSScreen.screens.first { $0.frame.minX...$0.frame.maxX ~= span.lowerBound } }
         for bar in bars {
@@ -71,7 +85,7 @@ final class AppMenuFader: NSObject {
 
     private func reveal() {
         cancelCover()
-        guard !isRevealed else { return }
+        guard !isRevealed, !bars.isEmpty else { return }
         isRevealed = true
         for bar in bars { bar.setHoverEnabled(false) }
         fade(to: 0)

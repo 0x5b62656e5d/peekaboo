@@ -20,6 +20,8 @@ final class Hider: NSObject {
     private var peeked: NSRunningApplication?
     private var peekEndMonitor: Any?
 
+    var onOpenSettings: (() -> Void)?
+
     func start() {
         item.autosaveName = "peekaboo.divider"
         item.isVisible = true
@@ -38,6 +40,12 @@ final class Hider: NSObject {
 
     /// Reads which side of the divider each app is on, then hides the left side. Only valid
     /// while nothing is restricted, because hidden items don't report positions.
+    func settingsChanged() {
+        item.isVisible = true
+        closeSecondBar()
+        updateIcon()
+    }
+
     private func collapse() {
         endPeek()
         guard AXIsProcessTrusted() else { return fail("Accessibility permission is needed") }
@@ -168,6 +176,10 @@ final class Hider: NSObject {
         applyRestriction()
     }
 
+    @objc private func openSettings() {
+        onOpenSettings?()
+    }
+
     @objc private func arrange() {
         expand()
     }
@@ -185,6 +197,7 @@ final class Hider: NSObject {
         if isCollapsed {
             menu.addItem(withTitle: "Arrange Icons", action: #selector(arrange), keyEquivalent: "").target = self
         }
+        menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Quit peekaboo", action: #selector(NSApplication.terminate), keyEquivalent: "")
         item.menu = menu
         item.button?.performClick(nil)
@@ -192,7 +205,7 @@ final class Hider: NSObject {
     }
 
     private func updateIcon() {
-        let symbol = isCollapsed ? "chevron.left" : "chevron.right"
+        let symbol = Settings.glyph.symbol(collapsed: isCollapsed)
         item.button?.image = NSImage(systemSymbolName: symbol, accessibilityDescription: "peekaboo divider")
     }
 }

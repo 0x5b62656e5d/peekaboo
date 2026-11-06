@@ -1,7 +1,30 @@
-import Foundation
+import AppKit
+import ServiceManagement
 
-enum RevealMode: String {
+enum RevealMode: String, CaseIterable {
     case inline, secondBar
+
+    var title: String {
+        switch self {
+        case .inline: "In the menu bar"
+        case .secondBar: "In a second bar"
+        }
+    }
+}
+
+enum DividerGlyph: String, CaseIterable {
+    case chevron, dot, diamond, line
+
+    var title: String { rawValue.capitalized }
+
+    func symbol(collapsed: Bool) -> String {
+        switch self {
+        case .chevron: collapsed ? "chevron.left" : "chevron.right"
+        case .dot: collapsed ? "circle.fill" : "circle"
+        case .diamond: collapsed ? "diamond.fill" : "diamond"
+        case .line: "poweron"
+        }
+    }
 }
 
 enum Settings {
@@ -10,5 +33,101 @@ enum Settings {
     static var revealMode: RevealMode {
         get { RevealMode(rawValue: defaults.string(forKey: "revealMode") ?? "") ?? .inline }
         set { defaults.set(newValue.rawValue, forKey: "revealMode") }
+    }
+
+    static var glyph: DividerGlyph {
+        get { DividerGlyph(rawValue: defaults.string(forKey: "glyph") ?? "") ?? .chevron }
+        set { defaults.set(newValue.rawValue, forKey: "glyph") }
+    }
+
+    static var fadesAppMenus: Bool {
+        get { defaults.object(forKey: "fadesAppMenus") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "fadesAppMenus") }
+    }
+
+    /// True once, on the first launch ever.
+    static func isFirstLaunch() -> Bool {
+        defer { defaults.set(true, forKey: "hasLaunched") }
+        return !defaults.bool(forKey: "hasLaunched")
+    }
+}
+
+/// The settings window. Built on open and released on close, so it costs nothing the rest of the time.
+final class SettingsWindow: NSObject, NSWindowDelegate {
+    private let window: NSWindow
+    private let onChange: () -> Void
+    private let onClose: () -> Void
+    private let glyphPicker = NSPopUpButton()
+    private let modePicker = NSPopUpButton()
+    private let fadeToggle = NSButton(checkboxWithTitle: "Fade app menus until hovered", target: nil, action: nil)
+    private let loginToggle = NSButton(checkboxWithTitle: "Launch at login", target: nil, action: nil)
+
+    init(onChange: @escaping () -> Void, onClose: @escaping () -> Void) {
+        self.onChange = onChange
+        self.onClose = onClose
+        window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.title = "peekaboo"
+        super.init()
+        window.delegate = self
+
+        glyphPicker.addItems(withTitles: DividerGlyph.allCases.map(\.title))
+        glyphPicker.selectItem(at: DividerGlyph.allCases.firstIndex(of: Settings.glyph) ?? 0)
+        modePicker.addItems(withTitles: RevealMode.allCases.map(\.title))
+        modePicker.selectItem(at: RevealMode.allCases.firstIndex(of: Settings.revealMode) ?? 0)
+        fadeToggle.state = Settings.fadesAppMenus ? .on : .off
+        loginToggle.state = SMAppService.mainApp.status == .enabled ? .on : .off
+        for control in [glyphPicker, modePicker, fadeToggle] {
+            control.target = self
+            control.action = #selector(controlChanged)
+        }
+        loginToggle.target = self
+        loginToggle.action = #selector(loginToggled)
+
+        let hint = NSTextField(wrappingLabelWithString: "⌘-drag menu bar icons to the left of the divider to hide them, or to the right to keep them visible. Apple's own icons always stay visible, and an app's icons hide together.")
+        hint.textColor = .secondaryLabelColor
+        hint.preferredMaxLayoutWidth = 340
+
+        let grid = NSGridView(views: [
+            [NSTextField(labelWithString: "Divider icon:"), glyphPicker],
+            [NSTextField(labelWithString: "Show hidden icons:"), modePicker],
+        ])
+        grid.column(at: 0).xPlacement = .trailing
+
+        let stack = NSStackView(views: [grid, fadeToggle, loginToggle, hint])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
+        window.contentView = stack
+        window.center()
+    }
+
+    func show() {
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
+    }
+
+    @objc private func controlChanged() {
+        Settings.glyph = DividerGlyph.allCases[glyphPicker.indexOfSelectedItem]
+        Settings.revealMode = RevealMode.allCases[modePicker.indexOfSelectedItem]
+        Settings.fadesAppMenus = fadeToggle.state == .on
+        onChange()
+    }
+
+    @objc private func loginToggled() {
+        do {
+            if loginToggle.state == .on {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+        } catch {
+            loginToggle.state = SMAppService.mainApp.status == .enabled ? .on : .off
+            NSAlert(error: error).runModal()
+        }
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        onClose()
     }
 }
