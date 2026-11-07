@@ -16,9 +16,8 @@ final class Hider: NSObject {
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private var hidden = Settings.hiddenBundleIDs
     private var isCollapsed = false
-    private var token: Any?
+    private let restriction = MenuBarRestriction()
     private var failure: String?
-    private var generation = 0
     private var secondBar: SecondBar?
     /// An app shown temporarily from the second bar, so its menu can open.
     private var peeked: NSRunningApplication?
@@ -92,35 +91,19 @@ final class Hider: NSObject {
         updateIcon()
     }
 
-    /// Allowing everything except the hidden set means a new app is visible by default. The new
-    /// restriction starts before the old one ends so the bar doesn't flash.
+    /// Allowing everything except the hidden set means a new app is visible by default.
     @objc private func applyRestriction() {
-        generation += 1
-        let generation = generation
-        guard isCollapsed, !hidden.isEmpty, !isShowingHidden else { return replaceToken(with: nil) }
+        guard isCollapsed, !hidden.isEmpty, !isShowingHidden else { return restriction.end() }
 
         // The divider must never hide, or the user has no way back. macOS also drops the items of
         // apps outside /Applications while restricted, so peekaboo has to be installed there.
         let running = NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier)
         let allowed = running.filter { !hidden.contains($0) || $0 == peeked?.bundleIdentifier } + [Bundle.main.bundleIdentifier ?? ""]
-        PKBMenuBarRestrictionBegin(allowed) { [weak self] token, error in
-            guard let self, generation == self.generation else {
-                if let token { PKBMenuBarRestrictionEnd(token) }
-                return
-            }
-            guard let token else {
-                self.replaceToken(with: nil)
-                self.isCollapsed = false
-                self.updateIcon()
-                return self.fail(error?.localizedDescription ?? "Hiding failed")
-            }
-            self.replaceToken(with: token)
+        restriction.allow(only: allowed) { [weak self] reason in
+            self?.isCollapsed = false
+            self?.updateIcon()
+            self?.fail(reason)
         }
-    }
-
-    private func replaceToken(with new: Any?) {
-        if let token { PKBMenuBarRestrictionEnd(token) }
-        token = new
     }
 
     private func fail(_ reason: String) {
