@@ -3,7 +3,6 @@ import AppKit
 /// Owns the divider and decides what's hidden. Apps with an item left of the divider are hidden.
 /// Hiding is per app, so an app with items on both sides stays visible.
 final class Hider: NSObject {
-    private static let hiddenKey = "hiddenBundleIDs"
     private static let systemOwners: Set<String> = ["com.apple.MenuBarAgent", "com.apple.controlcenter", "com.apple.systemuiserver"]
     private static let launchSettleDelay = 0.5
     private static let peekPollInterval = 0.05
@@ -19,7 +18,7 @@ final class Hider: NSObject {
     private static let fallbackIconSize: CGFloat = 20
 
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-    private var hidden = Set(UserDefaults.standard.stringArray(forKey: hiddenKey) ?? [])
+    private var hidden = Settings.hiddenBundleIDs
     private var isCollapsed = false
     private var token: Any?
     private var failure: String?
@@ -81,7 +80,7 @@ final class Hider: NSObject {
         }
         // Keep apps that aren't running, so they stay hidden when they next launch.
         hidden = hidden.subtracting(left.union(right)).union(left.subtracting(right))
-        UserDefaults.standard.set(Array(hidden), forKey: Self.hiddenKey)
+        Settings.hiddenBundleIDs = hidden
 
         failure = nil
         isCollapsed = true
@@ -89,7 +88,7 @@ final class Hider: NSObject {
         updateIcon()
     }
 
-    private func expand() {
+    @objc private func expand() {
         closeSecondBar()
         endPeek()
         isCollapsed = false
@@ -99,7 +98,7 @@ final class Hider: NSObject {
 
     /// Allowing everything except the hidden set means a new app is visible by default. The new
     /// restriction starts before the old one ends so the bar doesn't flash.
-    private func applyRestriction() {
+    @objc private func applyRestriction() {
         generation += 1
         let generation = generation
         guard isCollapsed, !hidden.isEmpty, !isShowingHidden else { return replaceToken(with: nil) }
@@ -138,12 +137,8 @@ final class Hider: NSObject {
               let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
               let bundleID = app.bundleIdentifier, !hidden.contains(bundleID) else { return }
         // Apps often launch in bursts, so coalesce the re-apply.
-        NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(reapply), object: nil)
-        perform(#selector(reapply), with: nil, afterDelay: Self.launchSettleDelay)
-    }
-
-    @objc private func reapply() {
-        applyRestriction()
+        NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(applyRestriction), object: nil)
+        perform(#selector(applyRestriction), with: nil, afterDelay: Self.launchSettleDelay)
     }
 
     private func toggleSecondBar() {
@@ -211,13 +206,13 @@ final class Hider: NSObject {
             itemsShownAt = Date()
             applyRestriction()
 
-            try? await Task.sleep(nanoseconds: UInt64(Self.showSettleDelay * 1_000_000_000))
+            try? await Task.sleep(for: .seconds(Self.showSettleDelay))
             // An inactive display draws its items dimmed, so read the one that was clicked.
             if let camera = try await BarCamera.all(hidingOwnWindows: true).first(where: { $0.screen.frame.contains(anchor.origin) }) {
                 while !Task.isCancelled {
                     try await readIcons(with: camera)
                     if once { break }
-                    try? await Task.sleep(nanoseconds: UInt64(Self.iconUpdateInterval * 1_000_000_000))
+                    try? await Task.sleep(for: .seconds(Self.iconUpdateInterval))
                 }
             }
         } catch {
@@ -325,10 +320,6 @@ final class Hider: NSObject {
         onOpenSettings?()
     }
 
-    @objc private func arrange() {
-        expand()
-    }
-
     @objc private func clicked() {
         guard NSApp.currentEvent?.type == .rightMouseUp else {
             if isCollapsed && Settings.revealMode == .secondBar { return toggleSecondBar() }
@@ -340,7 +331,7 @@ final class Hider: NSObject {
             menu.addItem(.separator())
         }
         if isCollapsed {
-            menu.addItem(withTitle: "Arrange Icons", action: #selector(arrange), keyEquivalent: "").target = self
+            menu.addItem(withTitle: "Arrange Icons", action: #selector(expand), keyEquivalent: "").target = self
         }
         menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Quit peekaboo", action: #selector(NSApplication.terminate), keyEquivalent: "")

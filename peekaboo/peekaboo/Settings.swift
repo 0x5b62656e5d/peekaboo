@@ -53,6 +53,11 @@ enum Settings {
         set { defaults.set(newValue, forKey: "fadesAppMenus") }
     }
 
+    static var hiddenBundleIDs: Set<String> {
+        get { Set(defaults.stringArray(forKey: "hiddenBundleIDs") ?? []) }
+        set { defaults.set(Array(newValue), forKey: "hiddenBundleIDs") }
+    }
+
     static func isFirstLaunch() -> Bool {
         defer { defaults.set(true, forKey: "hasLaunched") }
         return !defaults.bool(forKey: "hasLaunched")
