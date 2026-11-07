@@ -154,9 +154,6 @@ final class AppMenuFader: NSObject {
 
 /// One screen's cover and hover panels.
 private final class ScreenBar {
-    /// The reported bar height runs past what's drawn, so a full-height cover would clip the window below.
-    private static let coverBottomInset: CGFloat = 2
-
     let screen: NSScreen
     private let wallpaper: URL?
     private let barHeight: CGFloat
@@ -168,8 +165,8 @@ private final class ScreenBar {
 
     /// Returns nil when the screen has no visible bar, as with auto-hide or full screen.
     init?(screen: NSScreen, wallpaper: URL?, onHover: @escaping () -> Void) {
-        let barHeight = screen.frame.maxY - screen.visibleFrame.maxY
-        guard barHeight > 0, let wallpaper, let strip = Self.wallpaperStrip(screen: screen, url: wallpaper, height: barHeight - Self.coverBottomInset) else { return nil }
+        let barHeight = screen.menuBarHeight
+        guard barHeight > 0, let wallpaper, let strip = Self.wallpaperStrip(screen: screen, url: wallpaper, height: barHeight - NSScreen.menuBarCoverInset) else { return nil }
         self.screen = screen
         self.wallpaper = wallpaper
         self.barHeight = barHeight
@@ -178,7 +175,7 @@ private final class ScreenBar {
         barRect = CGRect(x: screen.frame.minX, y: screen.frame.maxY - barHeight, width: screen.frame.width, height: barHeight)
         hoverZone = CGRect(x: barRect.minX, y: barRect.minY, width: barRect.width / 2, height: barHeight)
 
-        coverPanel = Self.makePanel(frame: barRect, level: .statusBar)
+        coverPanel = NSPanel(barFrame: barRect, level: .statusBar, inFullScreen: false)
         coverPanel.ignoresMouseEvents = true
         let content = NSView()
         content.wantsLayer = true
@@ -186,7 +183,7 @@ private final class ScreenBar {
         content.layer?.contentsGravity = .resize
         coverPanel.contentView = content
 
-        hoverPanel = Self.makePanel(frame: hoverZone, level: NSWindow.Level(NSWindow.Level.statusBar.rawValue + 1))
+        hoverPanel = NSPanel(barFrame: hoverZone, level: NSWindow.Level(NSWindow.Level.statusBar.rawValue + 1), inFullScreen: false)
         hoverPanel.isOpaque = false
         hoverPanel.backgroundColor = .clear
         hoverPanel.ignoresMouseEvents = false
@@ -200,12 +197,12 @@ private final class ScreenBar {
     }
 
     func matches(_ screen: NSScreen, wallpaper: URL?) -> Bool {
-        screen.frame == screenFrame && screen.frame.maxY - screen.visibleFrame.maxY == barHeight && wallpaper == self.wallpaper
+        screen.frame == screenFrame && screen.menuBarHeight == barHeight && wallpaper == self.wallpaper
     }
 
     func cover(from start: CGFloat, to end: CGFloat) {
         let x = min(start, screenFrame.maxX), maxX = min(end, screenFrame.maxX)
-        let height = barHeight - Self.coverBottomInset
+        let height = barHeight - NSScreen.menuBarCoverInset
         coverPanel.setFrame(CGRect(x: x, y: screenFrame.maxY - height, width: maxX - x, height: height), display: false)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -236,18 +233,6 @@ private final class ScreenBar {
 
     func isOnBarOutsideHoverZone(_ point: CGPoint) -> Bool {
         NSPointInRect(point, barRect.insetBy(dx: 0, dy: -1)) && !isInHoverZone(point)
-    }
-
-    private static func makePanel(frame: CGRect, level: NSWindow.Level) -> NSPanel {
-        let panel = NSPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        panel.level = level
-        panel.hasShadow = false
-        panel.hidesOnDeactivate = false
-        panel.isReleasedWhenClosed = false
-        panel.animationBehavior = .none
-        // Without fullScreenAuxiliary the panels stay out of full-screen spaces.
-        panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
-        return panel
     }
 
     /// The top of the wallpaper, aspect-filled to the screen and rendered once at full bar width.

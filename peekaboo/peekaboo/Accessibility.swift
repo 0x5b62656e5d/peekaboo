@@ -28,7 +28,7 @@ struct BarItem {
 enum MenuBarAgent {
     private static let timeout: Float = 0.5
 
-    /// Every item on a display's bar, or the main display's by default, which has the same items.
+    /// Every item on a display's bar, left to right, or the main display's by default, which has the same items.
     /// MenuBarAgent's window holds them all, each wrapping an element from its owning process, so
     /// one read here replaces a walk over every running app.
     static func items(onDisplay display: CGRect? = nil) -> [BarItem] {
@@ -45,6 +45,6 @@ enum MenuBarAgent {
             var owner: pid_t = 0
             AXUIElementGetPid(button, &owner)
             return BarItem(owner: owner, frame: frame)
-        }
+        }.sorted { $0.frame.minX < $1.frame.minX }
     }
 }

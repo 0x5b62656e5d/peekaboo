@@ -229,7 +229,7 @@ final class Hider: NSObject {
 
     private func readIcons(with camera: BarCamera) async throws {
         let picture = try await camera.picture()
-        let items = MenuBarAgent.items(onDisplay: camera.displayFrame).sorted { $0.frame.minX < $1.frame.minX }
+        let items = MenuBarAgent.items(onDisplay: camera.displayFrame)
         guard !Task.isCancelled, !items.isEmpty else { return }
         let apps = hiddenApps()
         var itemCounts: [pid_t: Int] = [:]
@@ -276,7 +276,7 @@ final class Hider: NSObject {
     /// several, they stay up for the user to click.
     private func clickWhenVisible(_ icon: BarIcon, attemptsLeft: Int) {
         guard peeked == icon.app, attemptsLeft > 0 else { return }
-        let items = MenuBarAgent.items(onDisplay: secondBarDisplay).filter { $0.owner == icon.app.processIdentifier }.sorted { $0.frame.minX < $1.frame.minX }
+        let items = MenuBarAgent.items(onDisplay: secondBarDisplay).filter { $0.owner == icon.app.processIdentifier }
         let index = icon.itemIndex ?? 0
         guard items.indices.contains(index), -itemsShownAt.timeIntervalSinceNow >= Self.showSettleDelay else {
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.peekPollInterval) { [weak self] in

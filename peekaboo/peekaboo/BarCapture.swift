@@ -18,7 +18,7 @@ struct BarCamera {
             let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
             guard let display = content.displays.first(where: { $0.displayID == id }) else { return nil }
             let config = SCStreamConfiguration()
-            config.sourceRect = CGRect(x: 0, y: 0, width: screen.frame.width, height: screen.frame.maxY - screen.visibleFrame.maxY)
+            config.sourceRect = CGRect(x: 0, y: 0, width: screen.frame.width, height: screen.menuBarHeight)
             config.width = Int(config.sourceRect.width * screen.backingScaleFactor)
             config.height = Int(config.sourceRect.height * screen.backingScaleFactor)
             config.showsCursor = false
@@ -33,8 +33,6 @@ struct BarCamera {
 }
 
 struct BarPicture {
-    /// The bar's lowest points can hold a sliver of the window below it.
-    private static let coverBottomInset: CGFloat = 2
     /// The divider's pressed highlight spills past its frame and may be in the picture.
     private static let coverDividerGap: CGFloat = 4
 
@@ -56,17 +54,10 @@ struct BarPicture {
     /// drawn there unseen. They're real items under the cover, so it takes the clicks.
     func cover(leftOf dividerX: CGFloat, onClick: @escaping () -> Void) -> NSPanel? {
         let scale = CGFloat(image.width) / displayFrame.width
-        let bottom = screen.visibleFrame.maxY + Self.coverBottomInset
-        let frame = CGRect(x: screen.frame.midX, y: bottom, width: dividerX - Self.coverDividerGap - screen.frame.midX, height: screen.frame.maxY - bottom)
+        let frame = CGRect(x: screen.frame.midX, y: screen.visibleFrame.maxY + NSScreen.menuBarCoverInset, width: dividerX - Self.coverDividerGap - screen.frame.midX, height: screen.menuBarHeight - NSScreen.menuBarCoverInset)
         let crop = CGRect(x: (frame.minX - screen.frame.minX) * scale, y: 0, width: frame.width * scale, height: frame.height * scale)
         guard frame.width > 0, let part = image.cropping(to: crop) else { return nil }
-        let panel = NSPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        panel.level = .popUpMenu
-        panel.hasShadow = false
-        panel.hidesOnDeactivate = false
-        panel.isReleasedWhenClosed = false
-        panel.animationBehavior = .none
-        panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
+        let panel = NSPanel(barFrame: frame, level: .popUpMenu, inFullScreen: true)
         let view = CoverView(image: NSImage(cgImage: part, size: frame.size))
         view.imageScaling = .scaleAxesIndependently
         view.onClick = onClick

@@ -27,14 +27,10 @@ final class SecondBar: NSObject {
         self.onPick = onPick
         self.onDismiss = onDismiss
 
-        panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-        panel.level = .statusBar
+        panel = NSPanel(barFrame: .zero, level: .statusBar, inFullScreen: true)
+        panel.hasShadow = true
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hidesOnDeactivate = false
-        panel.isReleasedWhenClosed = false
-        panel.animationBehavior = .none
-        panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
         super.init()
 
         stack.spacing = 0
