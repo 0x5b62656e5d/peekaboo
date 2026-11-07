@@ -13,7 +13,7 @@ struct BarIcon {
     /// app launched since. Apps it looked at and found nothing for have no items, so they're left out.
     static func all(captured: [BarIcon], checked: Set<pid_t>, apps: [NSRunningApplication]) -> [BarIcon] {
         let running = Set(apps.map(\.processIdentifier))
-        let unchecked = apps.filter { !checked.contains($0.processIdentifier) }.map(BarIcon.init(standingInFor:))
+        let unchecked = apps.filter { !checked.contains($0.processIdentifier) }.map { BarIcon(standingInFor: $0) }
         return unchecked + captured.filter { running.contains($0.app.processIdentifier) }
     }
 }
