@@ -1,36 +1,54 @@
-# peekaboo
+<p align="center">
+  <img src="peekaboo/peekaboo/Assets.xcassets/AppIcon.appiconset/icon_256.png" width="128" alt="peekaboo's icon">
+</p>
 
-A macOS app that makes your menu bar look cleaner. Requires macOS 27.
+<h1 align="center">peekaboo</h1>
 
-- Hides the app menus (File, Edit, View...) until you hover the menu bar, using a macOS 27 setting. The Apple logo and app name stay.
-- Hides status icons behind a divider. ⌘-drag icons to the left of the divider to hide them, or to the right to keep them visible.
-- Optionally shows hidden icons in a second bar below the menu bar, for when the notch gets in the way.
+<p align="center">A tidier menu bar for macOS 27. Icons you don't need right now stay out of sight until you want them.</p>
 
-Click the divider to show or hide icons. Right-click it for Settings.
+## What it does
 
-## Install
+- **Tucks icons away.** A small divider sits in your menu bar. Anything to its left hides, and anything to its right stays put. Click the divider to peek at the hidden ones.
+- **Works around the notch.** If your icons get lost behind the notch, peekaboo can show the hidden ones in a little bar just below the menu bar instead. Their icons stay live, so things like CPU meters keep updating.
+- **Hides itself again.** Turn on auto-hide and revealed icons tuck themselves away after a delay you pick, from instantly to 10 seconds. It waits while you're using them.
+- **Quiets the app menus.** File, Edit, View and friends stay hidden until you hover the menu bar. The Apple logo and app name always stay.
 
-peekaboo isn't notarized, so macOS blocks it the first time.
+## Getting started
 
-1. Unzip it and move `peekaboo.app` to `/Applications`. It has to be there, because macOS drops the divider for apps run from other folders.
-2. Open it, then allow it under System Settings > Privacy & Security > Open Anyway.
-3. Grant Accessibility when asked. peekaboo needs it to read where your icons are.
-4. If you use the second bar, grant Screen Recording the first time you open it, then reopen peekaboo. It only captures the menu bar, when peekaboo launches and while the second bar is open. Without it, the second bar shows app icons instead.
+peekaboo isn't from the App Store or notarized by Apple, so macOS asks you to OK it the first time.
 
-## Limits
+1. Unzip it and drag `peekaboo.app` into your **Applications** folder. It needs to live there, because macOS hides the divider for apps run from anywhere else.
+2. Open it. If macOS blocks it, go to **System Settings > Privacy & Security** and click **Open Anyway**.
+3. Allow **Accessibility** when asked. That's how peekaboo sees where your icons are.
+4. Using the second bar? Allow **Screen Recording** the first time you open it, then reopen peekaboo. peekaboo only ever looks at the menu bar, when it launches and while the second bar is open. Without the permission, the second bar shows app icons instead.
 
-These come from macOS 27:
+## Using it
 
-- Hiding is per app, so all of an app's icons hide together.
-- Apple's own icons (clock, Wi-Fi, Control Center) always stay visible.
-- The second bar opens with the icons from the last time, then updates them about once a second while it's open, so the screen recording dot stays on until you close it. An icon that doesn't fit in the menu bar shows as its app icon.
-- Hiding the app menus is a system setting Apple doesn't document. It stays on after you quit peekaboo, so turn it off in peekaboo's Settings first if you want the menus back. A macOS update could remove it.
-- peekaboo uses a private Apple framework, so a macOS update could break hiding. If that happens, all your icons stay visible.
+- **Choose what hides:** hold ⌘ and drag icons left of the divider to hide them, or right of it to keep them visible.
+- **Show or hide:** click the divider.
+- **Settings:** right-click the divider and pick **Settings…**. If the divider ever goes missing, open peekaboo again from Applications and Settings comes up.
+- **Make it yours:** in Settings you can pick the divider's look (chevron, dot, diamond or line), choose the menu bar or the second bar for hidden icons, turn on auto-hide, and launch peekaboo at login.
 
-## Build
+## Good to know
+
+A few quirks come from how macOS 27 works:
+
+- **Apps hide as a whole.** If an app has several icons, they hide or show together.
+- **Some icons always stay.** Apple's own icons, like the clock, Wi-Fi and Control Center, are always visible.
+- **The recording dot.** The second bar takes a fresh look at your icons about once a second while it's open, so the screen recording dot stays on until you close it.
+- **Icons that don't fit.** If there's no room for an icon even in the menu bar, the second bar shows that app's icon instead.
+- **App menu hiding is a macOS setting.** It's one Apple hasn't documented, and peekaboo just switches it on. It stays on after you quit peekaboo, so turn it off in Settings first if you want your menus back for good.
+- **Updates can break things.** peekaboo relies on parts of macOS that Apple doesn't officially support, so a macOS update could break hiding. If that happens, all your icons simply stay visible.
+
+## Something not working?
+
+- **Permissions acting up?** Open Settings, then choose **Help > Reset All Permissions…** from the menu bar. peekaboo forgets its access, reopens and asks again.
+- **Divider gone?** Open peekaboo again from Applications to bring it back.
+
+## Building it yourself
 
 ```sh
 scripts/package.sh
 ```
 
-This writes `build/peekaboo.zip`, signed with your Apple Development certificate.
+This builds `build/peekaboo.zip`, signed with your Apple Development certificate.
