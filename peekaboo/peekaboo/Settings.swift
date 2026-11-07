@@ -100,7 +100,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         self.onChange = onChange
         self.onClose = onClose
         tabs.tabStyle = .toolbar
-        window = NSWindow(contentViewController: tabs)
+        window = CloseableWindow(contentViewController: tabs)
         window.styleMask = [.titled, .closable]
         window.isReleasedWhenClosed = false
         super.init()
@@ -251,6 +251,17 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         onClose()
+    }
+}
+
+/// Closes on ⌘W. peekaboo has no File or Window menu to hold a Close item.
+private final class CloseableWindow: NSWindow {
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command, event.charactersIgnoringModifiers == "w" else {
+            return super.performKeyEquivalent(with: event)
+        }
+        performClose(nil)
+        return true
     }
 }
 
