@@ -4,6 +4,8 @@ import AppKit
 struct BarIcon {
     let app: NSRunningApplication
     let image: NSImage
+    /// Which of the app's items this is, left to right. Nil for an app's icon, which stands for all of them.
+    var itemIndex: Int?
 }
 
 /// A small bar under the menu bar showing the hidden items. It holds nothing once closed.
@@ -16,11 +18,11 @@ final class SecondBar: NSObject {
     private let anchor: CGRect
     private let stack = NSStackView()
     private var icons: [BarIcon] = []
-    private let onPick: (NSRunningApplication) -> Void
+    private let onPick: (BarIcon) -> Void
     private let onDismiss: () -> Void
     private var outsideClickMonitor: Any?
 
-    init(icons: [BarIcon], under anchor: CGRect, onPick: @escaping (NSRunningApplication) -> Void, onDismiss: @escaping () -> Void) {
+    init(icons: [BarIcon], under anchor: CGRect, onPick: @escaping (BarIcon) -> Void, onDismiss: @escaping () -> Void) {
         self.anchor = anchor
         self.onPick = onPick
         self.onDismiss = onDismiss
@@ -59,9 +61,17 @@ final class SecondBar: NSObject {
     /// Pictures carry the bar's background, so they sit edge to edge to read as one strip.
     func show(_ icons: [BarIcon]) {
         self.icons = icons
-        stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        let views = icons.isEmpty ? [NSTextField(labelWithString: "Nothing hidden")] : icons.indices.map(makeButton)
-        views.forEach(stack.addArrangedSubview)
+        // Reusing the buttons means an update can't swallow a click in progress.
+        if let buttons = stack.arrangedSubviews as? [NSButton], !icons.isEmpty, buttons.count == icons.count {
+            for (button, icon) in zip(buttons, icons) {
+                button.image = icon.image
+                button.toolTip = icon.app.localizedName
+            }
+        } else {
+            stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+            let views = icons.isEmpty ? [NSTextField(labelWithString: "Nothing hidden")] : icons.indices.map(makeButton)
+            views.forEach(stack.addArrangedSubview)
+        }
         stack.edgeInsets = icons.isEmpty ? NSEdgeInsets(top: Self.padding, left: Self.padding, bottom: Self.padding, right: Self.padding) : NSEdgeInsetsZero
         let size = stack.fittingSize
         stack.frame = CGRect(origin: .zero, size: size)
@@ -90,6 +100,6 @@ final class SecondBar: NSObject {
     }
 
     @objc private func picked(_ sender: NSButton) {
-        onPick(icons[sender.tag].app)
+        onPick(icons[sender.tag])
     }
 }

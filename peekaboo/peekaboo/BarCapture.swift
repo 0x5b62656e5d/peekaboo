@@ -1,32 +1,46 @@
 import AppKit
 import ScreenCaptureKit
 
-/// A picture of one screen's menu bar. MenuBarAgent composites the icons, so the screen is the only
-/// place they can be read from.
-struct BarPicture {
+/// Takes pictures of one screen's menu bar. MenuBarAgent composites the icons, so the screen is
+/// the only place they can be read from.
+struct BarCamera {
     let screen: NSScreen
     /// The screen in global coordinates with a top-left origin, like AX frames.
     let displayFrame: CGRect
-    let image: CGImage
+    private let filter: SCContentFilter
+    private let config: SCStreamConfiguration
 
-    static func all(hidingOwnWindows: Bool) async throws -> [BarPicture] {
+    /// Own windows are left out of the pictures only if they exist when this is called.
+    static func all(hidingOwnWindows: Bool) async throws -> [BarCamera] {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         let own = hidingOwnWindows ? content.windows.filter { $0.owningApplication?.processID == getpid() } : []
-        var pictures: [BarPicture] = []
-        for screen in NSScreen.screens {
+        return NSScreen.screens.compactMap { screen in
             let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
-            guard let display = content.displays.first(where: { $0.displayID == id }) else { continue }
+            guard let display = content.displays.first(where: { $0.displayID == id }) else { return nil }
             let config = SCStreamConfiguration()
             config.sourceRect = CGRect(x: 0, y: 0, width: screen.frame.width, height: screen.frame.maxY - screen.visibleFrame.maxY)
             config.width = Int(config.sourceRect.width * screen.backingScaleFactor)
             config.height = Int(config.sourceRect.height * screen.backingScaleFactor)
             config.showsCursor = false
-            let filter = SCContentFilter(display: display, excludingWindows: own)
-            let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
-            pictures.append(BarPicture(screen: screen, displayFrame: display.frame, image: image))
+            return BarCamera(screen: screen, displayFrame: display.frame, filter: SCContentFilter(display: display, excludingWindows: own), config: config)
         }
-        return pictures
     }
+
+    func picture() async throws -> BarPicture {
+        let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+        return BarPicture(screen: screen, displayFrame: displayFrame, image: image)
+    }
+}
+
+struct BarPicture {
+    /// The bar's lowest points can hold a sliver of the window below it.
+    private static let coverBottomInset: CGFloat = 2
+    /// The divider's pressed highlight spills past its frame and may be in the picture.
+    private static let coverDividerGap: CGFloat = 4
+
+    let screen: NSScreen
+    let displayFrame: CGRect
+    let image: CGImage
 
     /// The part of the bar under an AX frame, trimmed to `height` around its center.
     func icon(at frame: CGRect, height: CGFloat) -> NSImage? {
@@ -38,21 +52,22 @@ struct BarPicture {
         return image.cropping(to: rect).map { NSImage(cgImage: $0, size: CGSize(width: frame.width, height: height)) }
     }
 
-    /// Puts the right half of the picture over the bar, so the items can change underneath unseen
-    /// while the app menus stay usable. The real items aren't where they appear, so the picture
-    /// takes the clicks.
-    func freeze(onClick: @escaping () -> Void) -> NSPanel? {
-        let half = CGRect(x: image.width / 2, y: 0, width: image.width - image.width / 2, height: image.height)
-        guard let right = image.cropping(to: half) else { return nil }
-        let barHeight = screen.frame.maxY - screen.visibleFrame.maxY
-        let frame = CGRect(x: screen.frame.midX, y: screen.visibleFrame.maxY, width: screen.frame.width / 2, height: barHeight)
+    /// Covers the bar between its middle and the divider with this picture, so hidden items can be
+    /// drawn there unseen. They're real items under the cover, so it takes the clicks.
+    func cover(leftOf dividerX: CGFloat, onClick: @escaping () -> Void) -> NSPanel? {
+        let scale = CGFloat(image.width) / displayFrame.width
+        let bottom = screen.visibleFrame.maxY + Self.coverBottomInset
+        let frame = CGRect(x: screen.frame.midX, y: bottom, width: dividerX - Self.coverDividerGap - screen.frame.midX, height: screen.frame.maxY - bottom)
+        let crop = CGRect(x: (frame.minX - screen.frame.minX) * scale, y: 0, width: frame.width * scale, height: frame.height * scale)
+        guard frame.width > 0, let part = image.cropping(to: crop) else { return nil }
         let panel = NSPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.level = .popUpMenu
+        panel.hasShadow = false
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.animationBehavior = .none
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
-        let view = FrozenBarView(image: NSImage(cgImage: right, size: frame.size))
+        let view = CoverView(image: NSImage(cgImage: part, size: frame.size))
         view.imageScaling = .scaleAxesIndependently
         view.onClick = onClick
         panel.contentView = view
@@ -62,7 +77,7 @@ struct BarPicture {
     }
 }
 
-private final class FrozenBarView: NSImageView {
+private final class CoverView: NSImageView {
     var onClick: (() -> Void)?
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
