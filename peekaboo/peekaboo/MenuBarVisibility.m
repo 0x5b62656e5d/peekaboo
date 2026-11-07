@@ -57,3 +57,10 @@ void PKBAllowCursorHidingInBackground(void) {
         setProperty(defaultConnection(), defaultConnection(), CFSTR("SetsCursorInBackground"), kCFBooleanTrue);
     }
 }
+
+CGImageRef PKBCreateImageBelowWindow(CGRect rect, CGWindowID window) {
+    static CGImageRef (*createImage)(CGRect, CGWindowListOption, CGWindowID, CGWindowImageOption);
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ createImage = dlsym(RTLD_DEFAULT, "CGWindowListCreateImage"); });
+    return createImage ? createImage(rect, kCGWindowListOptionOnScreenBelowWindow, window, kCGWindowImageNominalResolution) : NULL;
+}

@@ -15,8 +15,7 @@ struct BarCamera {
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
         let own = hidingOwnWindows ? content.windows.filter { $0.owningApplication?.processID == getpid() } : []
         return NSScreen.screens.compactMap { screen in
-            let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
-            guard let display = content.displays.first(where: { $0.displayID == id }) else { return nil }
+            guard let display = content.displays.first(where: { $0.displayID == screen.displayID }) else { return nil }
             let config = SCStreamConfiguration()
             config.sourceRect = CGRect(x: 0, y: 0, width: screen.frame.width, height: screen.menuBarHeight)
             config.width = Int(config.sourceRect.width * screen.backingScaleFactor)
@@ -73,17 +72,25 @@ struct BarPicture {
         let crop = CGRect(x: (frame.minX - screen.frame.minX) * scale, y: 0, width: frame.width * scale, height: frame.height * scale)
         guard frame.width > 0, let part = image.cropping(to: crop) else { return nil }
         let panel = NSPanel(barFrame: frame, level: .popUpMenu, inFullScreen: true)
-        let view = CoverView(image: NSImage(cgImage: part, size: frame.size))
-        view.imageScaling = .scaleAxesIndependently
+        let view = CoverView()
+        view.wantsLayer = true
+        view.layer?.contents = part
+        view.layer?.contentsGravity = .resize
         view.onClick = onClick
         panel.contentView = view
+        let slice = CGRect(x: (frame.minX - screen.frame.minX) / screen.frame.width, y: 0, width: frame.width / screen.frame.width, height: 1)
+        DesktopMirror.shared.observe(screen, owner: view) { [weak view] background in
+            guard let background else { return }
+            view?.layer?.contents = background
+            view?.layer?.contentsRect = slice
+        }
         panel.setFrame(frame, display: true)
         panel.orderFrontRegardless()
         return panel
     }
 }
 
-private final class CoverView: NSImageView {
+private final class CoverView: NSView {
     var onClick: (() -> Void)?
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }

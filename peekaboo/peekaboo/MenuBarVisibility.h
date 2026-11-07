@@ -1,4 +1,5 @@
 #import <Foundation/Foundation.h>
+#import <CoreGraphics/CoreGraphics.h>
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -12,5 +13,9 @@ void PKBMenuBarRestrictionEnd(id token);
 
 /// Lets this app hide the pointer while it isn't frontmost. Does nothing if macOS drops the private call.
 void PKBAllowCursorHidingInBackground(void);
+
+/// A picture of what's on screen below a window, at 1x. Nil if macOS drops the call, which it no longer
+/// declares publicly, or Screen Recording isn't granted.
+CGImageRef _Nullable PKBCreateImageBelowWindow(CGRect rect, CGWindowID window) CF_RETURNS_RETAINED;
 
 NS_ASSUME_NONNULL_END

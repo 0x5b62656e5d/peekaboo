@@ -5,6 +5,10 @@ extension NSScreen {
     static let menuBarCoverInset: CGFloat = 2
 
     var menuBarHeight: CGFloat { frame.maxY - visibleFrame.maxY }
+
+    var displayID: CGDirectDisplayID? {
+        deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+    }
 }
 
 extension NSPanel {
