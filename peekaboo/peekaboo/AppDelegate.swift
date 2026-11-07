@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         hider.onOpenSettings = { [weak self] in self?.showSettings() }
+        fader.isPeeking = { [hider] in hider.isPeeking }
         hider.start()
         fader.start()
         if Settings.isFirstLaunch() { showSettings() }

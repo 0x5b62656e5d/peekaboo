@@ -14,6 +14,9 @@ final class AppMenuFader: NSObject {
     private var isMenuOpen = false
     private var exitMonitor: Any?
 
+    /// Whether a hidden status icon was opened from the second bar, where the pointer says nothing about whose menu it is.
+    var isPeeking: () -> Bool = { false }
+
     func start() {
         let workspace = NSWorkspace.shared.notificationCenter
         workspace.addObserver(self, selector: #selector(frontmostChanged), name: NSWorkspace.didActivateApplicationNotification, object: nil)
@@ -133,7 +136,7 @@ final class AppMenuFader: NSObject {
         isMenuOpen = true
         // A status icon's menu shouldn't bring the app menus back, but one opened from the keyboard should.
         let pointer = NSEvent.mouseLocation
-        if !bars.contains(where: { $0.isOnBarOutsideHoverZone(pointer) }) { reveal() }
+        if !isPeeking(), !bars.contains(where: { $0.isOnBarOutsideHoverZone(pointer) }) { reveal() }
     }
 
     @objc private func menuClosed() {
