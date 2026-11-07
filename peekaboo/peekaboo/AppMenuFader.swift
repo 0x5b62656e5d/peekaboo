@@ -64,7 +64,11 @@ final class AppMenuFader: NSObject {
 
     @objc private func placeCovers() {
         guard !bars.isEmpty else { return }
-        let menus = frontmostMenuSpan()
+        let items = frontmostMenuItems()
+        // An app that activates just to show a status icon's menu, like Amphetamine, reports its
+        // menus with empty frames. That isn't a lack of menus, so the cover stays where it is.
+        if items.first?.frame?.size == .zero { return }
+        let menus = menuSpan(of: items)
         let base = menus.flatMap { span in NSScreen.screens.first { $0.frame.minX...$0.frame.maxX ~= span.lowerBound } }
         for bar in bars {
             if let menus, let base {
@@ -76,13 +80,16 @@ final class AppMenuFader: NSObject {
         }
     }
 
-    /// The x range of the menus after the Apple logo and app name, or nil if there aren't any.
-    private func frontmostMenuSpan() -> ClosedRange<CGFloat>? {
-        guard AXIsProcessTrusted(), let app = NSWorkspace.shared.frontmostApplication else { return nil }
+    private func frontmostMenuItems() -> [AXUIElement] {
+        guard AXIsProcessTrusted(), let app = NSWorkspace.shared.frontmostApplication else { return [] }
         let element = AXUIElementCreateApplication(app.processIdentifier)
         AXUIElementSetMessagingTimeout(element, Self.menuReadTimeout)
-        guard let menuBar = element.value(kAXMenuBarAttribute) else { return nil }
-        let items = (menuBar as! AXUIElement).children
+        guard let menuBar = element.value(kAXMenuBarAttribute) else { return [] }
+        return (menuBar as! AXUIElement).children
+    }
+
+    /// The x range of the menus after the Apple logo and app name, or nil if there aren't any.
+    private func menuSpan(of items: [AXUIElement]) -> ClosedRange<CGFloat>? {
         guard items.count > 2, let name = items[1].frame, let last = items[items.count - 1].frame, name.maxX < last.maxX else { return nil }
         return name.maxX...last.maxX
     }
