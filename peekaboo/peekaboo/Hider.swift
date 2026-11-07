@@ -36,8 +36,7 @@ final class Hider: NSObject {
     private var covers: [NSPanel] = []
     /// When hidden items last started to be drawn. They can't be clicked until they've settled.
     private var itemsShownAt = Date.distantPast
-    /// The display the second bar was opened on.
-    private var barDisplay: CGRect?
+    private var secondBarDisplay: CGRect?
 
     var onOpenSettings: (() -> Void)?
     var isPeeking: Bool { peeked != nil }
@@ -60,14 +59,14 @@ final class Hider: NSObject {
         if isCollapsed && Settings.revealMode == .secondBar { startIconUpdates(once: true) }
     }
 
-    /// Reads which side of the divider each app is on, then hides the left side. Only valid
-    /// while nothing is restricted, because hidden items don't report positions.
     func settingsChanged() {
         item.isVisible = true
         closeSecondBar()
         updateIcon()
     }
 
+    /// Reads which side of the divider each app is on, then hides the left side. Only valid
+    /// while nothing is restricted, because hidden items don't report positions.
     private func collapse() {
         endPeek()
         guard AXIsProcessTrusted() else { return fail("Accessibility permission is needed") }
@@ -204,7 +203,7 @@ final class Hider: NSObject {
                     self?.endPeek()
                 }
                 if let cover { panels.append(cover) }
-                if camera.screen.frame.contains(anchor.origin) { barDisplay = camera.displayFrame }
+                if camera.screen.frame.contains(anchor.origin) { secondBarDisplay = camera.displayFrame }
             }
             guard !Task.isCancelled else { return panels.forEach { $0.close() } }
             covers = panels
@@ -277,7 +276,7 @@ final class Hider: NSObject {
     /// several, they stay up for the user to click.
     private func clickWhenVisible(_ icon: BarIcon, attemptsLeft: Int) {
         guard peeked == icon.app, attemptsLeft > 0 else { return }
-        let items = MenuBarAgent.items(onDisplay: barDisplay).filter { $0.owner == icon.app.processIdentifier }.sorted { $0.frame.minX < $1.frame.minX }
+        let items = MenuBarAgent.items(onDisplay: secondBarDisplay).filter { $0.owner == icon.app.processIdentifier }.sorted { $0.frame.minX < $1.frame.minX }
         let index = icon.itemIndex ?? 0
         guard items.indices.contains(index), -itemsShownAt.timeIntervalSinceNow >= Self.showSettleDelay else {
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.peekPollInterval) { [weak self] in

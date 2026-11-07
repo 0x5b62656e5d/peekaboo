@@ -20,7 +20,6 @@ extension AXUIElement {
     }
 }
 
-/// A status item as MenuBarAgent lays it out.
 struct BarItem {
     let owner: pid_t
     let frame: CGRect

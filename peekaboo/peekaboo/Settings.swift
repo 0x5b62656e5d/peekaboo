@@ -53,7 +53,6 @@ enum Settings {
         set { defaults.set(newValue, forKey: "fadesAppMenus") }
     }
 
-    /// True once, on the first launch ever.
     static func isFirstLaunch() -> Bool {
         defer { defaults.set(true, forKey: "hasLaunched") }
         return !defaults.bool(forKey: "hasLaunched")

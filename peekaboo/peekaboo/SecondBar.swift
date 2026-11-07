@@ -76,7 +76,6 @@ final class SecondBar: NSObject {
         let size = stack.fittingSize
         stack.frame = CGRect(origin: .zero, size: size)
 
-        // Centered under the divider, kept on its screen.
         let screen = NSScreen.screens.first { $0.frame.contains(anchor.origin) } ?? NSScreen.screens[0]
         let x = min(max(anchor.midX - size.width / 2, screen.frame.minX), screen.frame.maxX - size.width)
         panel.setFrame(CGRect(x: x, y: screen.visibleFrame.maxY - size.height - Self.gapBelowMenuBar, width: size.width, height: size.height), display: true)
