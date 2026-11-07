@@ -11,10 +11,6 @@ final class Hider: NSObject {
     private static let showSettleDelay = 0.8
     private static let hideSettleDelay = 0.6
     private static let iconUpdateInterval = 1.0
-    /// A cover still catches clicks for a moment after it's told to ignore them, measured on macOS 27.
-    private static let coverReleaseDelay = 0.05
-    /// Long enough for a posted click to land before the pointer goes back.
-    private static let clickLandDelay = 0.03
     private static let fallbackIconSize: CGFloat = 20
 
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -280,31 +276,7 @@ final class Hider: NSObject {
             return
         }
         if icon.itemIndex != nil || items.count == 1 {
-            click(CGPoint(x: items[index].frame.midX, y: items[index].frame.midY))
-        }
-    }
-
-    /// Some apps, like Canapé, ignore AXPress and only respond to the mouse, and macOS 27 only
-    /// delivers clicks that move the pointer. So this is a real click, through the cover, with the
-    /// pointer hidden while it's away.
-    private func click(_ point: CGPoint) {
-        let panels = covers
-        panels.forEach { $0.ignoresMouseEvents = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.coverReleaseDelay) {
-            guard let pointer = CGEvent(source: nil)?.location else { return }
-            // By default macOS ignores the real mouse for 0.25s after a posted event or a warp.
-            let source = CGEventSource(stateID: .combinedSessionState)
-            source?.localEventsSuppressionInterval = 0
-            CGDisplayHideCursor(CGMainDisplayID())
-            for type in [CGEventType.leftMouseDown, .leftMouseUp] {
-                CGEvent(mouseEventSource: source, mouseType: type, mouseCursorPosition: point, mouseButton: .left)?.post(tap: .cghidEventTap)
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + Self.clickLandDelay) {
-                CGWarpMouseCursorPosition(pointer)
-                CGAssociateMouseAndMouseCursorPosition(1)
-                CGDisplayShowCursor(CGMainDisplayID())
-                panels.forEach { $0.ignoresMouseEvents = false }
-            }
+            PointerClick.post(at: CGPoint(x: items[index].frame.midX, y: items[index].frame.midY), through: covers)
         }
     }
 
