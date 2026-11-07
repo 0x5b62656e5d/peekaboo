@@ -36,9 +36,14 @@ struct BarCamera {
         let items = MenuBarAgent.items(onDisplay: displayFrame)
         guard !items.isEmpty else { return nil }
         var itemCounts: [pid_t: Int] = [:]
-        return items.compactMap { item in
-            guard let app = apps.first(where: { $0.processIdentifier == item.owner }),
-                  let image = picture.icon(at: item.frame, height: SecondBar.height) else { return nil }
+        var folded = Set<pid_t>()
+        return items.compactMap { item -> BarIcon? in
+            guard let app = apps.first(where: { $0.processIdentifier == item.owner }) else { return nil }
+            // macOS folded it away for lack of room, so there's nothing to capture.
+            if item.isOverflowed {
+                return folded.insert(item.owner).inserted ? BarIcon(standingInFor: app) : nil
+            }
+            guard let image = picture.icon(at: item.frame, height: SecondBar.height) else { return nil }
             let index = itemCounts[item.owner, default: 0]
             itemCounts[item.owner] = index + 1
             return BarIcon(app: app, image: image, itemIndex: index)

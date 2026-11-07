@@ -29,6 +29,8 @@ final class Hider: NSObject {
     private var peekEndMonitor: Any?
     /// The hidden items as last photographed, so the second bar can open without waiting for a new capture.
     private var capturedIcons: [BarIcon] = []
+    /// The apps the last capture looked at, so an app with nothing captured can be told from one it didn't check.
+    private var checkedApps = Set<pid_t>()
     private var iconUpdates: Task<Void, Never>?
     /// Set while nothing is restricted so the hidden items are drawn, with covers hiding them.
     private var lift: BarLift?
@@ -124,7 +126,7 @@ final class Hider: NSObject {
     private func toggleSecondBar() {
         guard secondBar == nil else { return closeSecondBar() }
         endPeek()
-        secondBar = SecondBar(icons: BarIcon.all(captured: capturedIcons, apps: hiddenApps()), under: item.button?.window?.frame ?? .zero, onPick: { [weak self] in self?.peek($0) }, onDismiss: { [weak self] in self?.closeSecondBar() })
+        secondBar = SecondBar(icons: BarIcon.all(captured: capturedIcons, checked: checkedApps, apps: hiddenApps()), under: item.button?.window?.frame ?? .zero, onPick: { [weak self] in self?.peek($0) }, onDismiss: { [weak self] in self?.closeSecondBar() })
         updateIcon()
         if !CGPreflightScreenCaptureAccess() { CGRequestScreenCaptureAccess() }
         startIconUpdates(once: false)
@@ -176,9 +178,11 @@ final class Hider: NSObject {
             // An inactive display draws its items dimmed, so read the one that was clicked.
             if let camera = try await BarCamera.all(hidingOwnWindows: true).first(where: { $0.screen.frame.contains(anchor.origin) }) {
                 while !Task.isCancelled {
-                    if let icons = try await camera.icons(of: hiddenApps()), !Task.isCancelled {
+                    let apps = hiddenApps()
+                    if let icons = try await camera.icons(of: apps), !Task.isCancelled {
                         capturedIcons = icons
-                        secondBar?.show(BarIcon.all(captured: icons, apps: hiddenApps()))
+                        checkedApps = Set(apps.map(\.processIdentifier))
+                        secondBar?.show(BarIcon.all(captured: icons, checked: checkedApps, apps: hiddenApps()))
                     }
                     if once { break }
                     try? await Task.sleep(for: .seconds(Self.iconUpdateInterval))
@@ -203,7 +207,13 @@ final class Hider: NSObject {
     private func peek(_ icon: BarIcon) {
         peeked = icon.app
         closeSecondBar()
-        if lift == nil { applyRestriction() }
+        // An app's icon usually means macOS folded the item away for lack of room. Showing that app
+        // alone with the visible ones gives it room.
+        if icon.itemIndex == nil, lift != nil {
+            restoreBar()
+        } else if lift == nil {
+            applyRestriction()
+        }
         clickWhenVisible(icon, shownAt: lift?.shownAt ?? Date(), attemptsLeft: Self.peekPollAttempts)
         peekEndMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             // A click on the bar may be on the peeked item, so only a click elsewhere ends the peek.
@@ -219,7 +229,7 @@ final class Hider: NSObject {
     /// several, they stay up for the user to click.
     private func clickWhenVisible(_ icon: BarIcon, shownAt: Date, attemptsLeft: Int) {
         guard peeked == icon.app, attemptsLeft > 0 else { return }
-        let items = MenuBarAgent.items(onDisplay: secondBarDisplay).filter { $0.owner == icon.app.processIdentifier }
+        let items = MenuBarAgent.items(onDisplay: secondBarDisplay).filter { $0.owner == icon.app.processIdentifier && !$0.isOverflowed }
         let index = icon.itemIndex ?? 0
         guard items.indices.contains(index), -shownAt.timeIntervalSinceNow >= Self.showSettleDelay else {
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.peekPollInterval) { [weak self] in

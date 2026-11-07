@@ -9,15 +9,21 @@ struct BarIcon {
 
     private static let appIconSize: CGFloat = 20
 
-    /// One icon per captured item of these apps, plus the app's own icon for any without a capture.
-    static func all(captured: [BarIcon], apps: [NSRunningApplication]) -> [BarIcon] {
-        var icons = captured.filter { icon in apps.contains { $0.processIdentifier == icon.app.processIdentifier } }
-        for app in apps where !icons.contains(where: { $0.app.processIdentifier == app.processIdentifier }) {
-            let image = app.icon ?? NSImage()
-            image.size = NSSize(width: appIconSize, height: appIconSize)
-            icons.append(BarIcon(app: app, image: image))
-        }
-        return icons
+    /// The captured icons of these apps, plus their app icon for any the capture didn't look at, like an
+    /// app launched since. Apps it looked at and found nothing for have no items, so they're left out.
+    static func all(captured: [BarIcon], checked: Set<pid_t>, apps: [NSRunningApplication]) -> [BarIcon] {
+        let running = Set(apps.map(\.processIdentifier))
+        let unchecked = apps.filter { !checked.contains($0.processIdentifier) }.map(BarIcon.init(standingInFor:))
+        return unchecked + captured.filter { running.contains($0.app.processIdentifier) }
+    }
+}
+
+extension BarIcon {
+    /// The app's own icon, standing in for all its items.
+    init(standingInFor app: NSRunningApplication) {
+        let image = app.icon ?? NSImage()
+        image.size = NSSize(width: Self.appIconSize, height: Self.appIconSize)
+        self.init(app: app, image: image)
     }
 }
 
