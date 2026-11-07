@@ -1,5 +1,11 @@
 import AppKit
 
+/// Hidden items drawn on the bar, under covers. They can't be clicked until they've settled.
+private struct BarLift {
+    let covers: [NSPanel]
+    let shownAt = Date()
+}
+
 /// Owns the divider and decides what's hidden. Apps with an item left of the divider are hidden.
 /// Hiding is per app, so an app with items on both sides stays visible.
 final class Hider: NSObject {
@@ -24,11 +30,8 @@ final class Hider: NSObject {
     /// The hidden items as last photographed, so the second bar can open without waiting for a new capture.
     private var capturedIcons: [BarIcon] = []
     private var iconUpdates: Task<Void, Never>?
-    /// Set while nothing is restricted so the hidden items are drawn, with `covers` hiding them.
-    private var isShowingHidden = false
-    private var covers: [NSPanel] = []
-    /// When hidden items last started to be drawn. They can't be clicked until they've settled.
-    private var itemsShownAt = Date.distantPast
+    /// Set while nothing is restricted so the hidden items are drawn, with covers hiding them.
+    private var lift: BarLift?
     private var secondBarDisplay: CGRect?
 
     var onOpenSettings: (() -> Void)?
@@ -92,7 +95,7 @@ final class Hider: NSObject {
 
     /// Allowing everything except the hidden set means a new app is visible by default.
     @objc private func applyRestriction() {
-        guard isCollapsed, !hidden.isEmpty, !isShowingHidden else { return restriction.end() }
+        guard isCollapsed, !hidden.isEmpty, lift == nil else { return restriction.end() }
 
         // The divider must never hide, or the user has no way back. macOS also drops the items of
         // apps outside /Applications while restricted, so peekaboo has to be installed there.
@@ -167,9 +170,7 @@ final class Hider: NSObject {
                 if camera.screen.frame.contains(anchor.origin) { secondBarDisplay = camera.displayFrame }
             }
             guard !Task.isCancelled else { return panels.forEach { $0.close() } }
-            covers = panels
-            isShowingHidden = true
-            itemsShownAt = Date()
+            lift = BarLift(covers: panels)
             applyRestriction()
 
             try? await Task.sleep(for: .seconds(Self.showSettleDelay))
@@ -192,12 +193,10 @@ final class Hider: NSObject {
     }
 
     private func restoreBar() {
-        guard isShowingHidden else { return }
-        isShowingHidden = false
+        guard let lift else { return }
+        self.lift = nil
         applyRestriction()
-        let panels = covers
-        covers = []
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.hideSettleDelay) { panels.forEach { $0.close() } }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.hideSettleDelay) { lift.covers.forEach { $0.close() } }
     }
 
     /// Opens a hidden item's menu. The item is already on the bar if the bar is lifted, otherwise its
@@ -205,11 +204,8 @@ final class Hider: NSObject {
     private func peek(_ icon: BarIcon) {
         peeked = icon.app
         closeSecondBar()
-        if !isShowingHidden {
-            itemsShownAt = Date()
-            applyRestriction()
-        }
-        clickWhenVisible(icon, attemptsLeft: Self.peekPollAttempts)
+        if lift == nil { applyRestriction() }
+        clickWhenVisible(icon, shownAt: lift?.shownAt ?? Date(), attemptsLeft: Self.peekPollAttempts)
         peekEndMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             // A click on the bar may be on the peeked item, so only a click elsewhere ends the peek.
             // This reads the event's location because the pointer has left a posted click's by now.
@@ -222,18 +218,18 @@ final class Hider: NSObject {
 
     /// An app's icon stands for all its items, so it only clicks when the app has just one. With
     /// several, they stay up for the user to click.
-    private func clickWhenVisible(_ icon: BarIcon, attemptsLeft: Int) {
+    private func clickWhenVisible(_ icon: BarIcon, shownAt: Date, attemptsLeft: Int) {
         guard peeked == icon.app, attemptsLeft > 0 else { return }
         let items = MenuBarAgent.items(onDisplay: secondBarDisplay).filter { $0.owner == icon.app.processIdentifier }
         let index = icon.itemIndex ?? 0
-        guard items.indices.contains(index), -itemsShownAt.timeIntervalSinceNow >= Self.showSettleDelay else {
+        guard items.indices.contains(index), -shownAt.timeIntervalSinceNow >= Self.showSettleDelay else {
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.peekPollInterval) { [weak self] in
-                self?.clickWhenVisible(icon, attemptsLeft: attemptsLeft - 1)
+                self?.clickWhenVisible(icon, shownAt: shownAt, attemptsLeft: attemptsLeft - 1)
             }
             return
         }
         if icon.itemIndex != nil || items.count == 1 {
-            PointerClick.post(at: CGPoint(x: items[index].frame.midX, y: items[index].frame.midY), through: covers)
+            PointerClick.post(at: CGPoint(x: items[index].frame.midX, y: items[index].frame.midY), through: lift?.covers ?? [])
         }
     }
 
@@ -242,7 +238,7 @@ final class Hider: NSObject {
         peekEndMonitor = nil
         guard peeked != nil else { return }
         peeked = nil
-        if isShowingHidden { restoreBar() } else { applyRestriction() }
+        if lift != nil { restoreBar() } else { applyRestriction() }
     }
 
     @objc private func openSettings() {
