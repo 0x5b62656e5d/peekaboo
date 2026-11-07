@@ -3,7 +3,6 @@ import AppKit
 @main
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hider = Hider()
-    private let fader = AppMenuFader()
     private var settingsWindow: SettingsWindow?
 
     static func main() {
@@ -14,10 +13,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         hider.onOpenSettings = { [weak self] in self?.showSettings() }
-        fader.isPeeking = { [hider] in hider.isPeeking }
+        let isFirstLaunch = Settings.isFirstLaunch()
+        Settings.adoptMenuHiding(isFirstLaunch: isFirstLaunch)
         hider.start()
-        fader.start()
-        if Settings.isFirstLaunch() { showSettings() }
+        if isFirstLaunch { showSettings() }
     }
 
     /// Opening the app again is the way back if the divider ever goes missing.
@@ -31,7 +30,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if settingsWindow == nil {
             settingsWindow = SettingsWindow(onChange: { [weak self] in
                 self?.hider.settingsChanged()
-                self?.fader.settingsChanged()
             }, onClose: { [weak self] in
                 self?.settingsWindow = nil
             })

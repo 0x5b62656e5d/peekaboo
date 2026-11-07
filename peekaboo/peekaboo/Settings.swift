@@ -37,6 +37,8 @@ enum DividerGlyph: String, CaseIterable {
 
 enum Settings {
     private static let defaults = UserDefaults.standard
+    /// macOS 27's own "show app menus only on hover". Apple doesn't document it.
+    private static let menusOnHoverKey = "MenuBarShowMenuItemsOnHover" as CFString
 
     static var revealMode: RevealMode {
         get { RevealMode(rawValue: defaults.string(forKey: "revealMode") ?? "") ?? .inline }
@@ -48,9 +50,19 @@ enum Settings {
         set { defaults.set(newValue.rawValue, forKey: "glyph") }
     }
 
-    static var fadesAppMenus: Bool {
-        get { defaults.object(forKey: "fadesAppMenus") as? Bool ?? true }
-        set { defaults.set(newValue, forKey: "fadesAppMenus") }
+    /// A system setting, so it stays after peekaboo quits.
+    static var hidesAppMenus: Bool {
+        get { CFPreferencesCopyValue(menusOnHoverKey, kCFPreferencesAnyApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost) as? Bool ?? false }
+        set {
+            CFPreferencesSetValue(menusOnHoverKey, newValue as CFBoolean, kCFPreferencesAnyApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+            CFPreferencesSynchronize(kCFPreferencesAnyApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
+        }
+    }
+
+    /// peekaboo used to fade the menus itself, on by default. This carries that choice over to macOS's setting once.
+    static func adoptMenuHiding(isFirstLaunch: Bool) {
+        if defaults.object(forKey: "fadesAppMenus") as? Bool ?? isFirstLaunch { hidesAppMenus = true }
+        defaults.removeObject(forKey: "fadesAppMenus")
     }
 
     static var hiddenBundleIDs: Set<String> {
@@ -71,7 +83,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     private let onClose: () -> Void
     private let glyphPicker = NSPopUpButton()
     private let modePicker = NSPopUpButton()
-    private let fadeToggle = NSButton(checkboxWithTitle: "Fade app menus until hovered", target: nil, action: nil)
+    private let menusToggle = NSButton(checkboxWithTitle: "Hide app menus until hovered", target: nil, action: nil)
     private let loginToggle = NSButton(checkboxWithTitle: "Launch at login", target: nil, action: nil)
 
     init(onChange: @escaping () -> Void, onClose: @escaping () -> Void) {
@@ -87,9 +99,9 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         glyphPicker.selectItem(at: DividerGlyph.allCases.firstIndex(of: Settings.glyph) ?? 0)
         modePicker.addItems(withTitles: RevealMode.allCases.map(\.title))
         modePicker.selectItem(at: RevealMode.allCases.firstIndex(of: Settings.revealMode) ?? 0)
-        fadeToggle.state = Settings.fadesAppMenus ? .on : .off
+        menusToggle.state = Settings.hidesAppMenus ? .on : .off
         loginToggle.state = SMAppService.mainApp.status == .enabled ? .on : .off
-        for control in [glyphPicker, modePicker, fadeToggle] {
+        for control in [glyphPicker, modePicker, menusToggle] {
             control.target = self
             control.action = #selector(controlChanged)
         }
@@ -106,7 +118,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         ])
         grid.column(at: 0).xPlacement = .trailing
 
-        let stack = NSStackView(views: [grid, fadeToggle, loginToggle, hint])
+        let stack = NSStackView(views: [grid, menusToggle, loginToggle, hint])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
@@ -122,7 +134,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     @objc private func controlChanged() {
         Settings.glyph = DividerGlyph.allCases[glyphPicker.indexOfSelectedItem]
         Settings.revealMode = RevealMode.allCases[modePicker.indexOfSelectedItem]
-        Settings.fadesAppMenus = fadeToggle.state == .on
+        Settings.hidesAppMenus = menusToggle.state == .on
         onChange()
     }
 

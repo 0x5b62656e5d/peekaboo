@@ -35,7 +35,6 @@ final class Hider: NSObject {
     private var secondBarDisplay: CGRect?
 
     var onOpenSettings: (() -> Void)?
-    var isPeeking: Bool { peeked != nil }
 
     func start() {
         item.autosaveName = "peekaboo.divider"
