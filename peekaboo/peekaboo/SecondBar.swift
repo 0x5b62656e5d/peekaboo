@@ -96,6 +96,10 @@ final class SecondBar: NSObject {
         panel.setFrame(CGRect(x: x, y: screen.visibleFrame.maxY - size.height - Self.gapBelowMenuBar, width: size.width, height: size.height), display: true)
     }
 
+    func contains(_ point: CGPoint) -> Bool {
+        panel.frame.contains(point)
+    }
+
     func close() {
         if let outsideClickMonitor { NSEvent.removeMonitor(outsideClickMonitor) }
         outsideClickMonitor = nil

@@ -70,6 +70,17 @@ enum Settings {
         set { defaults.set(Array(newValue), forKey: "hiddenBundleIDs") }
     }
 
+    static var autoHidesIcons: Bool {
+        get { defaults.bool(forKey: "autoHidesIcons") }
+        set { defaults.set(newValue, forKey: "autoHidesIcons") }
+    }
+
+    /// Seconds after revealing icons before they hide again.
+    static var autoHideDelay: Double {
+        get { defaults.object(forKey: "autoHideDelay") as? Double ?? 5 }
+        set { defaults.set(newValue, forKey: "autoHideDelay") }
+    }
+
     static func isFirstLaunch() -> Bool {
         defer { defaults.set(true, forKey: "hasLaunched") }
         return !defaults.bool(forKey: "hasLaunched")
@@ -84,6 +95,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     private static let rowInsets = NSEdgeInsets(top: 0, left: 12, bottom: 0, right: 12)
     private static let rowHeight: CGFloat = 40
     private static let aboutIconSize: CGFloat = 96
+    private static let maxAutoHideDelay = 10.0
+    private static let autoHideDelayStep = 0.5
 
     enum Tab: Int { case general, about }
 
@@ -95,6 +108,10 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     private let menusSwitch = NSSwitch()
     private let glyphPicker = NSPopUpButton()
     private let modePicker = NSPopUpButton()
+    private let autoHideSwitch = NSSwitch()
+    private let delaySlider = NSSlider()
+    private let delayLabel = NSTextField(labelWithString: "")
+    private lazy var delayRow = Self.row("Hide after", Self.stack([delaySlider, delayLabel]))
 
     init(onChange: @escaping () -> Void, onClose: @escaping () -> Void) {
         self.onChange = onChange
@@ -114,8 +131,22 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         glyphPicker.selectItem(at: DividerGlyph.allCases.firstIndex(of: Settings.glyph) ?? 0)
         modePicker.addItems(withTitles: RevealMode.allCases.map(\.title))
         modePicker.selectItem(at: RevealMode.allCases.firstIndex(of: Settings.revealMode) ?? 0)
+        autoHideSwitch.state = Settings.autoHidesIcons ? .on : .off
+        autoHideSwitch.controlSize = .small
+        delaySlider.minValue = 0
+        delaySlider.maxValue = Self.maxAutoHideDelay
+        delaySlider.numberOfTickMarks = Int(Self.maxAutoHideDelay / Self.autoHideDelayStep) + 1
+        delaySlider.allowsTickMarkValuesOnly = true
+        delaySlider.tickMarkPosition = .below
+        delaySlider.controlSize = .small
+        delaySlider.doubleValue = Settings.autoHideDelay
+        delaySlider.widthAnchor.constraint(equalToConstant: 200).isActive = true
+        delayLabel.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        delayLabel.textColor = .secondaryLabelColor
+        showDelay()
         for (control, action) in [(loginSwitch, #selector(loginToggled)), (menusSwitch, #selector(menusToggled)),
-                                  (glyphPicker, #selector(glyphChanged)), (modePicker, #selector(modeChanged))] as [(NSControl, Selector)] {
+                                  (glyphPicker, #selector(glyphChanged)), (modePicker, #selector(modeChanged)),
+                                  (autoHideSwitch, #selector(autoHideToggled)), (delaySlider, #selector(delayChanged))] as [(NSControl, Selector)] {
             control.target = self
             control.action = action
         }
@@ -139,7 +170,9 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
             Self.row("Hide app menus until hovered", menusSwitch),
             Self.row("Divider icon", glyphPicker),
             Self.row("Show hidden icons", modePicker),
+            Self.stack([Self.row("Hide icons automatically", autoHideSwitch), delayRow], vertical: true),
         ])
+        delayRow.isHidden = !Settings.autoHidesIcons
         let hint = NSTextField(wrappingLabelWithString: "⌘-drag menu bar icons left of the divider to hide them, or right of it to keep them visible. Apple's own icons always stay visible, and an app's icons hide together.")
         hint.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         hint.textColor = .secondaryLabelColor
@@ -187,6 +220,14 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         return item
     }
 
+    private static func stack(_ views: [NSView], vertical: Bool = false) -> NSStackView {
+        let stack = NSStackView(views: views)
+        stack.orientation = vertical ? .vertical : .horizontal
+        stack.spacing = vertical ? 0 : 8
+        if vertical { views.forEach { $0.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true } }
+        return stack
+    }
+
     /// A label on the left and its control on the right.
     private static func row(_ title: String, _ control: NSView) -> NSView {
         let label = NSTextField(labelWithString: title)
@@ -230,6 +271,21 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     @objc private func modeChanged() {
         Settings.revealMode = RevealMode.allCases[modePicker.indexOfSelectedItem]
         onChange()
+    }
+
+    @objc private func autoHideToggled() {
+        Settings.autoHidesIcons = autoHideSwitch.state == .on
+        delayRow.isHidden = autoHideSwitch.state == .off
+        tabs.fitWindow()
+    }
+
+    @objc private func delayChanged() {
+        Settings.autoHideDelay = delaySlider.doubleValue
+        showDelay()
+    }
+
+    private func showDelay() {
+        delayLabel.stringValue = String(format: "%.1fs", delaySlider.doubleValue)
     }
 
     @objc private func menusToggled() {

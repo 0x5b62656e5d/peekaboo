@@ -13,6 +13,8 @@ final class Hider: NSObject {
     private static let launchSettleDelay = 0.5
     private static let peekPollInterval = 0.05
     private static let peekPollAttempts = 40
+    /// How often auto-hide checks back while the icons are still in use.
+    private static let autoHideRecheck = 0.5
     /// How long the bar takes to redraw after the allow-list changes, measured on macOS 27.
     private static let showSettleDelay = 0.8
     private static let hideSettleDelay = 0.6
@@ -27,6 +29,7 @@ final class Hider: NSObject {
     /// An app shown temporarily from the second bar, so its menu can open.
     private var peeked: NSRunningApplication?
     private var peekEndMonitor: Any?
+    private var isMenuOpen = false
     /// The hidden items as last photographed, so the second bar can open without waiting for a new capture.
     private var capturedIcons: [BarIcon] = []
     /// The apps the last capture looked at, so an app with nothing captured can be told from one it didn't check.
@@ -46,7 +49,8 @@ final class Hider: NSObject {
         item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
 
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(appLaunched), name: NSWorkspace.didLaunchApplicationNotification, object: nil)
-        DistributedNotificationCenter.default().addObserver(self, selector: #selector(endPeek), name: .init("com.apple.HIToolbox.endMenuTrackingNotification"), object: nil)
+        DistributedNotificationCenter.default().addObserver(self, selector: #selector(menuOpened), name: .init("com.apple.HIToolbox.beginMenuTrackingNotification"), object: nil)
+        DistributedNotificationCenter.default().addObserver(self, selector: #selector(menuClosed), name: .init("com.apple.HIToolbox.endMenuTrackingNotification"), object: nil)
 
         _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
         PKBAllowCursorHidingInBackground()
@@ -65,6 +69,7 @@ final class Hider: NSObject {
     /// Reads which side of the divider each app is on, then hides the left side. Only valid
     /// while nothing is restricted, because hidden items don't report positions.
     private func collapse() {
+        cancelAutoHide()
         endPeek()
         guard AXIsProcessTrusted() else { return fail("Accessibility permission is needed") }
         let items = MenuBarAgent.items()
@@ -87,6 +92,7 @@ final class Hider: NSObject {
     }
 
     @objc private func expand() {
+        cancelAutoHide()
         closeSecondBar()
         endPeek()
         isCollapsed = false
@@ -133,6 +139,7 @@ final class Hider: NSObject {
     }
 
     private func closeSecondBar() {
+        cancelAutoHide()
         iconUpdates?.cancel()
         secondBar?.close()
         secondBar = nil
@@ -218,10 +225,7 @@ final class Hider: NSObject {
         peekEndMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             // A click on the bar may be on the peeked item, so only a click elsewhere ends the peek.
             // This reads the event's location because the pointer has left a posted click's by now.
-            let pointer = event.locationInWindow
-            if !NSScreen.screens.contains(where: { $0.visibleFrame.maxY <= pointer.y && $0.frame.minX...$0.frame.maxX ~= pointer.x }) {
-                self?.endPeek()
-            }
+            if !Self.isOnMenuBar(event.locationInWindow) { self?.endPeek() }
         }
     }
 
@@ -256,8 +260,15 @@ final class Hider: NSObject {
 
     @objc private func clicked() {
         guard NSApp.currentEvent?.type == .rightMouseUp else {
-            if isCollapsed && Settings.revealMode == .secondBar { return toggleSecondBar() }
-            return isCollapsed ? expand() : collapse()
+            if isCollapsed && Settings.revealMode == .secondBar {
+                toggleSecondBar()
+            } else if isCollapsed {
+                expand()
+            } else {
+                collapse()
+            }
+            // Only a click reveals for auto-hide. Arrange Icons leaves the icons up while they're moved.
+            return scheduleAutoHide()
         }
         let menu = NSMenu()
         if let failure {
@@ -272,6 +283,38 @@ final class Hider: NSObject {
         item.menu = menu
         item.button?.performClick(nil)
         item.menu = nil
+    }
+
+    private func scheduleAutoHide(after delay: Double = Settings.autoHideDelay) {
+        cancelAutoHide()
+        guard Settings.autoHidesIcons, secondBar != nil || !isCollapsed else { return }
+        perform(#selector(autoHide), with: nil, afterDelay: delay)
+    }
+
+    private func cancelAutoHide() {
+        NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(autoHide), object: nil)
+    }
+
+    /// Waits while the icons are in use: a menu open, an item picked, or the pointer on the bar or the second bar.
+    @objc private func autoHide() {
+        let pointer = NSEvent.mouseLocation
+        if isMenuOpen || peeked != nil || Self.isOnMenuBar(pointer) || secondBar?.contains(pointer) == true {
+            return scheduleAutoHide(after: Self.autoHideRecheck)
+        }
+        if secondBar != nil { closeSecondBar() } else if !isCollapsed { collapse() }
+    }
+
+    @objc private func menuOpened() {
+        isMenuOpen = true
+    }
+
+    @objc private func menuClosed() {
+        isMenuOpen = false
+        endPeek()
+    }
+
+    private static func isOnMenuBar(_ point: CGPoint) -> Bool {
+        NSScreen.screens.contains { $0.visibleFrame.maxY <= point.y && $0.frame.minX...$0.frame.maxX ~= point.x }
     }
 
     private func updateIcon() {
