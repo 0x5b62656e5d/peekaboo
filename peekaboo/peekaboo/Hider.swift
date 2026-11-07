@@ -298,12 +298,16 @@ final class Hider: NSObject {
         panels.forEach { $0.ignoresMouseEvents = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.coverReleaseDelay) {
             guard let pointer = CGEvent(source: nil)?.location else { return }
+            // By default macOS ignores the real mouse for 0.25s after a posted event or a warp.
+            let source = CGEventSource(stateID: .combinedSessionState)
+            source?.localEventsSuppressionInterval = 0
             CGDisplayHideCursor(CGMainDisplayID())
             for type in [CGEventType.leftMouseDown, .leftMouseUp] {
-                CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: .left)?.post(tap: .cghidEventTap)
+                CGEvent(mouseEventSource: source, mouseType: type, mouseCursorPosition: point, mouseButton: .left)?.post(tap: .cghidEventTap)
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.clickLandDelay) {
                 CGWarpMouseCursorPosition(pointer)
+                CGAssociateMouseAndMouseCursorPosition(1)
                 CGDisplayShowCursor(CGMainDisplayID())
                 panels.forEach { $0.ignoresMouseEvents = false }
             }
