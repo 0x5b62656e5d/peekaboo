@@ -319,7 +319,8 @@ final class Hider: NSObject {
 
     private func updateIcon() {
         let state: DividerState = secondBar != nil ? .secondBarOpen : isCollapsed ? .collapsed : .expanded
-        let symbol = Settings.glyph.symbol(for: state)
-        item.button?.image = NSImage(systemSymbolName: symbol, accessibilityDescription: "peekaboo divider")
+        let glyph = Settings.glyph
+        let image = NSImage(systemSymbolName: glyph.symbol(for: state), accessibilityDescription: "peekaboo divider")
+        item.button?.image = glyph.configuration.flatMap { image?.withSymbolConfiguration($0) } ?? image
     }
 }

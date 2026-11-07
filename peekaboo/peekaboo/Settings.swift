@@ -33,6 +33,14 @@ enum DividerGlyph: String, CaseIterable {
         case (.line, _): "poweron"
         }
     }
+
+    /// Filled shapes at the default size look heavy next to the bar's other icons.
+    var configuration: NSImage.SymbolConfiguration? {
+        switch self {
+        case .dot, .diamond: NSImage.SymbolConfiguration(pointSize: 9, weight: .regular)
+        case .chevron, .line: nil
+        }
+    }
 }
 
 enum Settings {
