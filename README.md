@@ -2,7 +2,7 @@
 
 A macOS app that makes your menu bar look cleaner. Requires macOS 27.
 
-- Fades the app menus (File, Edit, View...) until the pointer is on the left half of the menu bar. The Apple logo and app name stay.
+- Hides the app menus (File, Edit, View...) until you hover the menu bar, using a macOS 27 setting. The Apple logo and app name stay.
 - Hides status icons behind a divider. ⌘-drag icons to the left of the divider to hide them, or to the right to keep them visible.
 - Optionally shows hidden icons in a second bar below the menu bar, for when the notch gets in the way.
 
@@ -24,7 +24,7 @@ These come from macOS 27:
 - Hiding is per app, so all of an app's icons hide together.
 - Apple's own icons (clock, Wi-Fi, Control Center) always stay visible.
 - The second bar opens with the icons from the last time, then updates them about once a second while it's open, so the screen recording dot stays on until you close it. An icon that doesn't fit in the menu bar shows as its app icon.
-- The fade matches your wallpaper when it's set to fill the screen. Other wallpaper scaling modes, or a menu bar with its background turned on, won't match exactly.
+- Hiding the app menus is a system setting Apple doesn't document. It stays on after you quit peekaboo, so turn it off in peekaboo's Settings first if you want the menus back. A macOS update could remove it.
 - peekaboo uses a private Apple framework, so a macOS update could break hiding. If that happens, all your icons stay visible.
 
 ## Build
