@@ -53,6 +53,7 @@ final class Hider: NSObject {
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(endPeek), name: .init("com.apple.HIToolbox.endMenuTrackingNotification"), object: nil)
 
         _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
+        PKBAllowCursorHidingInBackground()
         isCollapsed = !hidden.isEmpty
         applyRestriction()
         updateIcon()
@@ -289,19 +290,21 @@ final class Hider: NSObject {
         }
     }
 
-    /// Some apps, like Canapé, ignore AXPress and only respond to the mouse, and macOS 27 doesn't
-    /// deliver clicks posted straight to a process. So this is a real click, through the cover,
-    /// with the pointer put back right after.
+    /// Some apps, like Canapé, ignore AXPress and only respond to the mouse, and macOS 27 only
+    /// delivers clicks that move the pointer. So this is a real click, through the cover, with the
+    /// pointer hidden while it's away.
     private func click(_ point: CGPoint) {
         let panels = covers
         panels.forEach { $0.ignoresMouseEvents = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.coverReleaseDelay) {
             guard let pointer = CGEvent(source: nil)?.location else { return }
+            CGDisplayHideCursor(CGMainDisplayID())
             for type in [CGEventType.leftMouseDown, .leftMouseUp] {
                 CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: .left)?.post(tap: .cghidEventTap)
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.clickLandDelay) {
                 CGWarpMouseCursorPosition(pointer)
+                CGDisplayShowCursor(CGMainDisplayID())
                 panels.forEach { $0.ignoresMouseEvents = false }
             }
         }

@@ -49,3 +49,11 @@ void PKBMenuBarRestrictionEnd(id token) {
         NSLog(@"peekaboo: ending restriction failed: %@", exception.reason);
     }
 }
+
+void PKBAllowCursorHidingInBackground(void) {
+    int (*defaultConnection)(void) = dlsym(RTLD_DEFAULT, "_CGSDefaultConnection");
+    void (*setProperty)(int, int, CFStringRef, CFTypeRef) = dlsym(RTLD_DEFAULT, "CGSSetConnectionProperty");
+    if (defaultConnection && setProperty) {
+        setProperty(defaultConnection(), defaultConnection(), CFSTR("SetsCursorInBackground"), kCFBooleanTrue);
+    }
+}

@@ -10,4 +10,7 @@ void PKBMenuBarRestrictionBegin(NSArray<NSString *> *allowedBundleIDs,
 
 void PKBMenuBarRestrictionEnd(id token);
 
+/// Lets this app hide the pointer while it isn't frontmost. Does nothing if macOS drops the private call.
+void PKBAllowCursorHidingInBackground(void);
+
 NS_ASSUME_NONNULL_END
