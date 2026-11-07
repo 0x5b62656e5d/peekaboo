@@ -4,6 +4,8 @@ set -eu
 cd "$(dirname "$0")/.."
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 
-xcodebuild -project peekaboo/peekaboo.xcodeproj -scheme peekaboo -configuration Release -derivedDataPath build/dd build -quiet
-ditto -c -k --keepParent build/dd/Build/Products/Release/peekaboo.app build/peekaboo.zip
+# Building the target rather than a scheme skips Xcode's run-destination lookup, which only logs noise here.
+xcodebuild -project peekaboo/peekaboo.xcodeproj -target peekaboo -configuration Release \
+    SYMROOT="$PWD/build/products" OBJROOT="$PWD/build/intermediates" build -quiet
+ditto -c -k --keepParent build/products/Release/peekaboo.app build/peekaboo.zip
 echo "build/peekaboo.zip"
