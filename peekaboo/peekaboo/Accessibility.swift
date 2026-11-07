@@ -10,7 +10,7 @@ extension AXUIElement {
         value(kAXChildrenAttribute) as? [AXUIElement] ?? []
     }
 
-    /// Position and size in global coordinates with a top-left origin. Only x is used, which is the same in AppKit's.
+    /// Position and size in global coordinates with a top-left origin.
     var frame: CGRect? {
         guard let position = value(kAXPositionAttribute), let size = value(kAXSizeAttribute) else { return nil }
         var rect = CGRect.zero
@@ -25,24 +25,29 @@ struct BarItem {
     /// The item's button in its owner's process, which is what responds to AXPress.
     let button: AXUIElement
     let owner: pid_t
-    let x: CGFloat
+    let frame: CGRect
 }
 
 enum MenuBarAgent {
     private static let timeout: Float = 0.5
 
-    /// Every item on the bar. MenuBarAgent's window holds them all, each wrapping an element from
-    /// its owning process, so one read here replaces a walk over every running app.
-    static func items() -> [BarItem] {
+    /// Every item on a display's bar, or the main display's by default, which has the same items.
+    /// MenuBarAgent's window holds them all, each wrapping an element from its owning process, so
+    /// one read here replaces a walk over every running app.
+    static func items(onDisplay display: CGRect? = nil) -> [BarItem] {
         guard let agent = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.MenuBarAgent").first else { return [] }
         let app = AXUIElementCreateApplication(agent.processIdentifier)
         AXUIElementSetMessagingTimeout(app, timeout)
-        guard let window = (app.value(kAXWindowsAttribute) as? [AXUIElement])?.first else { return [] }
+        let windows = app.value(kAXWindowsAttribute) as? [AXUIElement] ?? []
+        guard let window = windows.first(where: { window in
+            guard let display else { return true }
+            return window.frame.map { display.contains($0.origin) } ?? false
+        }) else { return [] }
         return window.children.compactMap { group in
             guard let frame = group.frame, let button = group.children.first else { return nil }
             var owner: pid_t = 0
             AXUIElementGetPid(button, &owner)
-            return BarItem(button: button, owner: owner, x: frame.minX)
+            return BarItem(button: button, owner: owner, frame: frame)
         }
     }
 }

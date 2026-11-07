@@ -1,19 +1,25 @@
 import AppKit
 
-/// A small bar under the menu bar with one icon per hidden app. It holds nothing once closed.
+/// A hidden item's picture from the menu bar, or its app's icon if it couldn't be captured.
+struct BarIcon {
+    let app: NSRunningApplication
+    let image: NSImage
+}
+
+/// A small bar under the menu bar showing the hidden items. It holds nothing once closed.
 final class SecondBar: NSObject {
-    private static let iconSize: CGFloat = 20
+    static let height: CGFloat = 28
     private static let padding: CGFloat = 8
     private static let gapBelowMenuBar: CGFloat = 4
 
     private let panel: NSPanel
-    private let apps: [NSRunningApplication]
+    private let icons: [BarIcon]
     private let onPick: (NSRunningApplication) -> Void
     private let onDismiss: () -> Void
     private var outsideClickMonitor: Any?
 
-    init(apps: [NSRunningApplication], under anchor: CGRect, onPick: @escaping (NSRunningApplication) -> Void, onDismiss: @escaping () -> Void) {
-        self.apps = apps
+    init(icons: [BarIcon], under anchor: CGRect, onPick: @escaping (NSRunningApplication) -> Void, onDismiss: @escaping () -> Void) {
+        self.icons = icons
         self.onPick = onPick
         self.onDismiss = onDismiss
 
@@ -27,15 +33,16 @@ final class SecondBar: NSObject {
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
         super.init()
 
-        let stack = NSStackView(views: apps.isEmpty ? [NSTextField(labelWithString: "Nothing hidden")] : apps.indices.map(makeButton))
-        stack.spacing = Self.padding
-        stack.edgeInsets = NSEdgeInsets(top: Self.padding, left: Self.padding, bottom: Self.padding, right: Self.padding)
+        // Pictures carry the bar's background, so they sit edge to edge to read as one strip.
+        let stack = NSStackView(views: icons.isEmpty ? [NSTextField(labelWithString: "Nothing hidden")] : icons.indices.map(makeButton))
+        stack.spacing = 0
+        stack.edgeInsets = icons.isEmpty ? NSEdgeInsets(top: Self.padding, left: Self.padding, bottom: Self.padding, right: Self.padding) : NSEdgeInsetsZero
 
         let background = NSVisualEffectView()
         background.material = .menu
         background.state = .active
         background.wantsLayer = true
-        background.layer?.cornerRadius = Self.iconSize / 2
+        background.layer?.cornerRadius = Self.height / 2
         background.layer?.masksToBounds = true
         background.addSubview(stack)
         stack.frame = CGRect(origin: .zero, size: stack.fittingSize)
@@ -63,16 +70,17 @@ final class SecondBar: NSObject {
     }
 
     private func makeButton(at index: Int) -> NSButton {
-        let icon = apps[index].icon ?? NSImage()
-        icon.size = NSSize(width: Self.iconSize, height: Self.iconSize)
-        let button = NSButton(image: icon, target: self, action: #selector(picked))
+        let button = NSButton(image: icons[index].image, target: self, action: #selector(picked))
         button.tag = index
         button.isBordered = false
-        button.toolTip = apps[index].localizedName
+        button.imageScaling = .scaleNone
+        button.toolTip = icons[index].app.localizedName
+        button.heightAnchor.constraint(equalToConstant: Self.height).isActive = true
+        button.widthAnchor.constraint(greaterThanOrEqualToConstant: Self.height).isActive = true
         return button
     }
 
     @objc private func picked(_ sender: NSButton) {
-        onPick(apps[sender.tag])
+        onPick(icons[sender.tag].app)
     }
 }
