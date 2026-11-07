@@ -6,6 +6,19 @@ struct BarIcon {
     let image: NSImage
     /// Which of the app's items this is, left to right. Nil for an app's icon, which stands for all of them.
     var itemIndex: Int?
+
+    private static let appIconSize: CGFloat = 20
+
+    /// One icon per captured item of these apps, plus the app's own icon for any without a capture.
+    static func all(captured: [BarIcon], apps: [NSRunningApplication]) -> [BarIcon] {
+        var icons = captured.filter { icon in apps.contains { $0.processIdentifier == icon.app.processIdentifier } }
+        for app in apps where !icons.contains(where: { $0.app.processIdentifier == app.processIdentifier }) {
+            let image = app.icon ?? NSImage()
+            image.size = NSSize(width: appIconSize, height: appIconSize)
+            icons.append(BarIcon(app: app, image: image))
+        }
+        return icons
+    }
 }
 
 /// A small bar under the menu bar showing the hidden items. It holds nothing once closed.

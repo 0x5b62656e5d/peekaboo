@@ -30,6 +30,21 @@ struct BarCamera {
         let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
         return BarPicture(screen: screen, displayFrame: displayFrame, image: image)
     }
+
+    /// Pictures of these apps' items as they are on the bar now, or nil if the bar can't be read.
+    func icons(of apps: [NSRunningApplication]) async throws -> [BarIcon]? {
+        let picture = try await picture()
+        let items = MenuBarAgent.items(onDisplay: displayFrame)
+        guard !items.isEmpty else { return nil }
+        var itemCounts: [pid_t: Int] = [:]
+        return items.compactMap { item in
+            guard let app = apps.first(where: { $0.processIdentifier == item.owner }),
+                  let image = picture.icon(at: item.frame, height: SecondBar.height) else { return nil }
+            let index = itemCounts[item.owner, default: 0]
+            itemCounts[item.owner] = index + 1
+            return BarIcon(app: app, image: image, itemIndex: index)
+        }
+    }
 }
 
 struct BarPicture {

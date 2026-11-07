@@ -11,7 +11,6 @@ final class Hider: NSObject {
     private static let showSettleDelay = 0.8
     private static let hideSettleDelay = 0.6
     private static let iconUpdateInterval = 1.0
-    private static let fallbackIconSize: CGFloat = 20
 
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
     private var hidden = Settings.hiddenBundleIDs
@@ -123,7 +122,7 @@ final class Hider: NSObject {
     private func toggleSecondBar() {
         guard secondBar == nil else { return closeSecondBar() }
         endPeek()
-        secondBar = SecondBar(icons: currentIcons(), under: item.button?.window?.frame ?? .zero, onPick: { [weak self] in self?.peek($0) }, onDismiss: { [weak self] in self?.closeSecondBar() })
+        secondBar = SecondBar(icons: BarIcon.all(captured: capturedIcons, apps: hiddenApps()), under: item.button?.window?.frame ?? .zero, onPick: { [weak self] in self?.peek($0) }, onDismiss: { [weak self] in self?.closeSecondBar() })
         updateIcon()
         if !CGPreflightScreenCaptureAccess() { CGRequestScreenCaptureAccess() }
         startIconUpdates(once: false)
@@ -134,18 +133,6 @@ final class Hider: NSObject {
         secondBar?.close()
         secondBar = nil
         updateIcon()
-    }
-
-    /// The latest pictures of the hidden items, with the app's icon for any app without one.
-    private func currentIcons() -> [BarIcon] {
-        let apps = hiddenApps()
-        var icons = capturedIcons.filter { icon in apps.contains { $0.processIdentifier == icon.app.processIdentifier } }
-        for app in apps where !icons.contains(where: { $0.app.processIdentifier == app.processIdentifier }) {
-            let image = app.icon ?? NSImage()
-            image.size = NSSize(width: Self.fallbackIconSize, height: Self.fallbackIconSize)
-            icons.append(BarIcon(app: app, image: image))
-        }
-        return icons
     }
 
     private func hiddenApps() -> [NSRunningApplication] {
@@ -189,7 +176,10 @@ final class Hider: NSObject {
             // An inactive display draws its items dimmed, so read the one that was clicked.
             if let camera = try await BarCamera.all(hidingOwnWindows: true).first(where: { $0.screen.frame.contains(anchor.origin) }) {
                 while !Task.isCancelled {
-                    try await readIcons(with: camera)
+                    if let icons = try await camera.icons(of: hiddenApps()), !Task.isCancelled {
+                        capturedIcons = icons
+                        secondBar?.show(BarIcon.all(captured: icons, apps: hiddenApps()))
+                    }
                     if once { break }
                     try? await Task.sleep(for: .seconds(Self.iconUpdateInterval))
                 }
@@ -199,22 +189,6 @@ final class Hider: NSObject {
         }
         // A picked item stays drawn until its menu closes.
         if peeked == nil { restoreBar() }
-    }
-
-    private func readIcons(with camera: BarCamera) async throws {
-        let picture = try await camera.picture()
-        let items = MenuBarAgent.items(onDisplay: camera.displayFrame)
-        guard !Task.isCancelled, !items.isEmpty else { return }
-        let apps = hiddenApps()
-        var itemCounts: [pid_t: Int] = [:]
-        capturedIcons = items.compactMap { item in
-            guard let app = apps.first(where: { $0.processIdentifier == item.owner }),
-                  let image = picture.icon(at: item.frame, height: SecondBar.height) else { return nil }
-            let index = itemCounts[item.owner, default: 0]
-            itemCounts[item.owner] = index + 1
-            return BarIcon(app: app, image: image, itemIndex: index)
-        }
-        secondBar?.show(currentIcons())
     }
 
     private func restoreBar() {
