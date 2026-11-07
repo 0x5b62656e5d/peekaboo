@@ -53,8 +53,8 @@ final class SecondBar: NSObject {
         // MenuBarAgent draws the divider, so its clicks reach this monitor. Leave those to the divider's
         // own toggle, or mouse-down would close the bar and mouse-up would reopen it.
         let divider = anchor.insetBy(dx: 0, dy: -1)
-        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            if !divider.contains(NSEvent.mouseLocation) { self?.onDismiss() }
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            if !divider.contains(event.locationInWindow) { self?.onDismiss() }
         }
     }
 

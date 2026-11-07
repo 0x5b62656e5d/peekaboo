@@ -12,6 +12,10 @@ final class Hider: NSObject {
     private static let showSettleDelay = 0.8
     private static let hideSettleDelay = 0.6
     private static let iconUpdateInterval = 1.0
+    /// A cover still catches clicks for a moment after it's told to ignore them, measured on macOS 27.
+    private static let coverReleaseDelay = 0.05
+    /// Long enough for a posted click to land before the pointer goes back.
+    private static let clickLandDelay = 0.03
     private static let fallbackIconSize: CGFloat = 20
 
     private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -30,6 +34,8 @@ final class Hider: NSObject {
     /// Set while nothing is restricted so the hidden items are drawn, with `covers` hiding them.
     private var isShowingHidden = false
     private var covers: [NSPanel] = []
+    /// When hidden items last started to be drawn. They can't be clicked until they've settled.
+    private var itemsShownAt = Date.distantPast
     /// The display the second bar was opened on.
     private var barDisplay: CGRect?
 
@@ -202,6 +208,7 @@ final class Hider: NSObject {
             guard !Task.isCancelled else { return panels.forEach { $0.close() } }
             covers = panels
             isShowingHidden = true
+            itemsShownAt = Date()
             applyRestriction()
 
             try? await Task.sleep(nanoseconds: UInt64(Self.showSettleDelay * 1_000_000_000))
@@ -250,31 +257,53 @@ final class Hider: NSObject {
     private func peek(_ icon: BarIcon) {
         peeked = icon.app
         closeSecondBar()
-        if !isShowingHidden { applyRestriction() }
-        pressWhenVisible(icon, attemptsLeft: Self.peekPollAttempts)
-        peekEndMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+        if !isShowingHidden {
+            itemsShownAt = Date()
+            applyRestriction()
+        }
+        clickWhenVisible(icon, attemptsLeft: Self.peekPollAttempts)
+        peekEndMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
             // A click on the bar may be on the peeked item, so only a click elsewhere ends the peek.
-            let pointer = NSEvent.mouseLocation
+            // This reads the event's location because the pointer has left a posted click's by now.
+            let pointer = event.locationInWindow
             if !NSScreen.screens.contains(where: { $0.visibleFrame.maxY <= pointer.y && $0.frame.minX...$0.frame.maxX ~= pointer.x }) {
                 self?.endPeek()
             }
         }
     }
 
-    /// An app's icon stands for all its items, so it only presses when the app has just one. With
+    /// An app's icon stands for all its items, so it only clicks when the app has just one. With
     /// several, they stay up for the user to click.
-    private func pressWhenVisible(_ icon: BarIcon, attemptsLeft: Int) {
+    private func clickWhenVisible(_ icon: BarIcon, attemptsLeft: Int) {
         guard peeked == icon.app, attemptsLeft > 0 else { return }
         let items = MenuBarAgent.items(onDisplay: barDisplay).filter { $0.owner == icon.app.processIdentifier }.sorted { $0.frame.minX < $1.frame.minX }
         let index = icon.itemIndex ?? 0
-        guard items.indices.contains(index) else {
+        guard items.indices.contains(index), -itemsShownAt.timeIntervalSinceNow >= Self.showSettleDelay else {
             DispatchQueue.main.asyncAfter(deadline: .now() + Self.peekPollInterval) { [weak self] in
-                self?.pressWhenVisible(icon, attemptsLeft: attemptsLeft - 1)
+                self?.clickWhenVisible(icon, attemptsLeft: attemptsLeft - 1)
             }
             return
         }
         if icon.itemIndex != nil || items.count == 1 {
-            AXUIElementPerformAction(items[index].button, kAXPressAction as CFString)
+            click(CGPoint(x: items[index].frame.midX, y: items[index].frame.midY))
+        }
+    }
+
+    /// Some apps, like Canapé, ignore AXPress and only respond to the mouse, and macOS 27 doesn't
+    /// deliver clicks posted straight to a process. So this is a real click, through the cover,
+    /// with the pointer put back right after.
+    private func click(_ point: CGPoint) {
+        let panels = covers
+        panels.forEach { $0.ignoresMouseEvents = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.coverReleaseDelay) {
+            guard let pointer = CGEvent(source: nil)?.location else { return }
+            for type in [CGEventType.leftMouseDown, .leftMouseUp] {
+                CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: .left)?.post(tap: .cghidEventTap)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.clickLandDelay) {
+                CGWarpMouseCursorPosition(pointer)
+                panels.forEach { $0.ignoresMouseEvents = false }
+            }
         }
     }
 
