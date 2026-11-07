@@ -13,13 +13,15 @@ final class SecondBar: NSObject {
     private static let gapBelowMenuBar: CGFloat = 4
 
     private let panel: NSPanel
-    private let icons: [BarIcon]
+    private let anchor: CGRect
+    private let stack = NSStackView()
+    private var icons: [BarIcon] = []
     private let onPick: (NSRunningApplication) -> Void
     private let onDismiss: () -> Void
     private var outsideClickMonitor: Any?
 
     init(icons: [BarIcon], under anchor: CGRect, onPick: @escaping (NSRunningApplication) -> Void, onDismiss: @escaping () -> Void) {
-        self.icons = icons
+        self.anchor = anchor
         self.onPick = onPick
         self.onDismiss = onDismiss
 
@@ -33,10 +35,7 @@ final class SecondBar: NSObject {
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
         super.init()
 
-        // Pictures carry the bar's background, so they sit edge to edge to read as one strip.
-        let stack = NSStackView(views: icons.isEmpty ? [NSTextField(labelWithString: "Nothing hidden")] : icons.indices.map(makeButton))
         stack.spacing = 0
-        stack.edgeInsets = icons.isEmpty ? NSEdgeInsets(top: Self.padding, left: Self.padding, bottom: Self.padding, right: Self.padding) : NSEdgeInsetsZero
 
         let background = NSVisualEffectView()
         background.material = .menu
@@ -45,14 +44,8 @@ final class SecondBar: NSObject {
         background.layer?.cornerRadius = Self.height / 2
         background.layer?.masksToBounds = true
         background.addSubview(stack)
-        stack.frame = CGRect(origin: .zero, size: stack.fittingSize)
         panel.contentView = background
-
-        // Centered under the divider, kept on its screen.
-        let size = stack.fittingSize
-        let screen = NSScreen.screens.first { $0.frame.contains(anchor.origin) } ?? NSScreen.screens[0]
-        let x = min(max(anchor.midX - size.width / 2, screen.frame.minX), screen.frame.maxX - size.width)
-        panel.setFrame(CGRect(x: x, y: screen.visibleFrame.maxY - size.height - Self.gapBelowMenuBar, width: size.width, height: size.height), display: true)
+        show(icons)
         panel.orderFrontRegardless()
 
         // MenuBarAgent draws the divider, so its clicks reach this monitor. Leave those to the divider's
@@ -61,6 +54,22 @@ final class SecondBar: NSObject {
         outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             if !divider.contains(NSEvent.mouseLocation) { self?.onDismiss() }
         }
+    }
+
+    /// Pictures carry the bar's background, so they sit edge to edge to read as one strip.
+    func show(_ icons: [BarIcon]) {
+        self.icons = icons
+        stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        let views = icons.isEmpty ? [NSTextField(labelWithString: "Nothing hidden")] : icons.indices.map(makeButton)
+        views.forEach(stack.addArrangedSubview)
+        stack.edgeInsets = icons.isEmpty ? NSEdgeInsets(top: Self.padding, left: Self.padding, bottom: Self.padding, right: Self.padding) : NSEdgeInsetsZero
+        let size = stack.fittingSize
+        stack.frame = CGRect(origin: .zero, size: size)
+
+        // Centered under the divider, kept on its screen.
+        let screen = NSScreen.screens.first { $0.frame.contains(anchor.origin) } ?? NSScreen.screens[0]
+        let x = min(max(anchor.midX - size.width / 2, screen.frame.minX), screen.frame.maxX - size.width)
+        panel.setFrame(CGRect(x: x, y: screen.visibleFrame.maxY - size.height - Self.gapBelowMenuBar, width: size.width, height: size.height), display: true)
     }
 
     func close() {

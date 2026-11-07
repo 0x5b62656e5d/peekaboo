@@ -38,22 +38,34 @@ struct BarPicture {
         return image.cropping(to: rect).map { NSImage(cgImage: $0, size: CGSize(width: frame.width, height: height)) }
     }
 
-    /// Puts the picture over the bar so the bar can change underneath without being seen.
-    func freeze() -> NSPanel {
+    /// Puts the right half of the picture over the bar, so the items can change underneath unseen
+    /// while the app menus stay usable. The real items aren't where they appear, so the picture
+    /// takes the clicks.
+    func freeze(onClick: @escaping () -> Void) -> NSPanel? {
+        let half = CGRect(x: image.width / 2, y: 0, width: image.width - image.width / 2, height: image.height)
+        guard let right = image.cropping(to: half) else { return nil }
         let barHeight = screen.frame.maxY - screen.visibleFrame.maxY
-        let frame = CGRect(x: screen.frame.minX, y: screen.visibleFrame.maxY, width: screen.frame.width, height: barHeight)
+        let frame = CGRect(x: screen.frame.midX, y: screen.visibleFrame.maxY, width: screen.frame.width / 2, height: barHeight)
         let panel = NSPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.level = .popUpMenu
-        panel.ignoresMouseEvents = true
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.animationBehavior = .none
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
-        let view = NSImageView(image: NSImage(cgImage: image, size: frame.size))
+        let view = FrozenBarView(image: NSImage(cgImage: right, size: frame.size))
         view.imageScaling = .scaleAxesIndependently
+        view.onClick = onClick
         panel.contentView = view
         panel.setFrame(frame, display: true)
         panel.orderFrontRegardless()
         return panel
     }
+}
+
+private final class FrozenBarView: NSImageView {
+    var onClick: (() -> Void)?
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func mouseDown(with event: NSEvent) { onClick?() }
+    override func rightMouseDown(with event: NSEvent) { onClick?() }
 }
