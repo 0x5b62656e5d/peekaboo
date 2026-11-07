@@ -158,8 +158,13 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
 
     func show(_ tab: Tab = .general) {
         tabs.selectedTabViewItemIndex = tab.rawValue
-        NSApp.activate()
+        // An app without a Dock icon never takes over the menu bar, so it becomes a regular app while this is open.
+        NSApp.setActivationPolicy(.regular)
+        // The polite activate() gets turned down when another app is in front, which leaves the menu bar
+        // showing that app. Settings is always opened on purpose, so it takes focus.
+        NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
         // Otherwise the first control opens with a focus ring, as if it had been clicked.
         window.makeFirstResponder(nil)
     }
@@ -306,6 +311,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
         onClose()
     }
 }
