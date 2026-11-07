@@ -76,72 +76,115 @@ enum Settings {
     }
 }
 
-/// The settings window, laid out like System Settings. Built on open and released on close, so it costs
-/// nothing the rest of the time.
+/// The settings window, with General and About tabs laid out like System Settings. Built on open and
+/// released on close, so it costs nothing the rest of the time.
 final class SettingsWindow: NSObject, NSWindowDelegate {
     private static let width: CGFloat = 400
     private static let margin: CGFloat = 20
     private static let rowInsets = NSEdgeInsets(top: 0, left: 12, bottom: 0, right: 12)
     private static let rowHeight: CGFloat = 40
+    private static let aboutIconSize: CGFloat = 96
+
+    enum Tab: Int { case general, about }
 
     private let window: NSWindow
+    private let tabs = FittingTabViewController()
     private let onChange: () -> Void
     private let onClose: () -> Void
+    private let loginSwitch = NSSwitch()
+    private let menusSwitch = NSSwitch()
     private let glyphPicker = NSPopUpButton()
     private let modePicker = NSPopUpButton()
-    private let menusSwitch = NSSwitch()
-    private let loginSwitch = NSSwitch()
 
     init(onChange: @escaping () -> Void, onClose: @escaping () -> Void) {
         self.onChange = onChange
         self.onClose = onClose
-        window = NSWindow(contentRect: .zero, styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        tabs.tabStyle = .toolbar
+        window = NSWindow(contentViewController: tabs)
+        window.styleMask = [.titled, .closable]
         window.isReleasedWhenClosed = false
-        window.title = "peekaboo"
         super.init()
         window.delegate = self
 
+        loginSwitch.state = SMAppService.mainApp.status == .enabled ? .on : .off
+        menusSwitch.state = Settings.hidesAppMenus ? .on : .off
+        loginSwitch.controlSize = .small
+        menusSwitch.controlSize = .small
         glyphPicker.addItems(withTitles: DividerGlyph.allCases.map(\.title))
         glyphPicker.selectItem(at: DividerGlyph.allCases.firstIndex(of: Settings.glyph) ?? 0)
         modePicker.addItems(withTitles: RevealMode.allCases.map(\.title))
         modePicker.selectItem(at: RevealMode.allCases.firstIndex(of: Settings.revealMode) ?? 0)
-        menusSwitch.state = Settings.hidesAppMenus ? .on : .off
-        loginSwitch.state = SMAppService.mainApp.status == .enabled ? .on : .off
-        menusSwitch.controlSize = .small
-        loginSwitch.controlSize = .small
-        for (control, action) in [(glyphPicker, #selector(glyphChanged)), (modePicker, #selector(modeChanged)),
-                                  (menusSwitch, #selector(menusToggled)), (loginSwitch, #selector(loginToggled))] as [(NSControl, Selector)] {
+        for (control, action) in [(loginSwitch, #selector(loginToggled)), (menusSwitch, #selector(menusToggled)),
+                                  (glyphPicker, #selector(glyphChanged)), (modePicker, #selector(modeChanged))] as [(NSControl, Selector)] {
             control.target = self
             control.action = action
         }
 
+        tabs.addTabViewItem(Self.tab("General", symbol: "gearshape", view: makeGeneral()))
+        tabs.addTabViewItem(Self.tab("About", symbol: "info.circle", view: Self.makeAbout()))
+        window.center()
+    }
+
+    func show(_ tab: Tab = .general) {
+        tabs.selectedTabViewItemIndex = tab.rawValue
+        NSApp.activate()
+        window.makeKeyAndOrderFront(nil)
+        // Otherwise the first control opens with a focus ring, as if it had been clicked.
+        window.makeFirstResponder(nil)
+    }
+
+    private func makeGeneral() -> NSView {
         let group = Self.group([
+            Self.row("Launch at login", loginSwitch),
+            Self.row("Hide app menus until hovered", menusSwitch),
             Self.row("Divider icon", glyphPicker),
             Self.row("Show hidden icons", modePicker),
-            Self.row("Hide app menus until hovered", menusSwitch),
-            Self.row("Launch at login", loginSwitch),
         ])
         let hint = NSTextField(wrappingLabelWithString: "⌘-drag menu bar icons left of the divider to hide them, or right of it to keep them visible. Apple's own icons always stay visible, and an app's icons hide together.")
         hint.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         hint.textColor = .secondaryLabelColor
-
-        let content = NSStackView(views: [group, hint])
-        content.orientation = .vertical
-        content.spacing = 8
-        content.edgeInsets = NSEdgeInsets(top: Self.margin, left: Self.margin, bottom: Self.margin, right: Self.margin)
-        // Without a fixed width the stack drops its side margins and fits the window to the group.
-        content.widthAnchor.constraint(equalToConstant: Self.width + Self.margin * 2).isActive = true
+        let page = Self.page([group, hint], alignment: .leading)
         group.widthAnchor.constraint(equalToConstant: Self.width).isActive = true
         hint.widthAnchor.constraint(equalTo: group.widthAnchor, constant: -Self.rowInsets.left * 2).isActive = true
-        window.contentView = content
-        window.center()
+        return page
     }
 
-    func show() {
-        NSApp.activate()
-        window.makeKeyAndOrderFront(nil)
-        // Otherwise the first picker opens with a focus ring, as if it had been clicked.
-        window.makeFirstResponder(nil)
+    /// The app's icon, name and version as x.y.z (build).
+    private static func makeAbout() -> NSView {
+        // NSApp.applicationIconImage can hold on to a stale placeholder, so ask for the icon Finder shows.
+        let icon = NSImageView(image: NSWorkspace.shared.icon(forFile: Bundle.main.bundlePath))
+        icon.imageScaling = .scaleProportionallyUpOrDown
+        icon.widthAnchor.constraint(equalToConstant: aboutIconSize).isActive = true
+        icon.heightAnchor.constraint(equalToConstant: aboutIconSize).isActive = true
+        let name = NSTextField(labelWithString: "peekaboo")
+        name.font = .systemFont(ofSize: NSFont.systemFontSize + 4, weight: .semibold)
+        let info = Bundle.main.infoDictionary
+        let version = NSTextField(labelWithString: "Version \(info?["CFBundleShortVersionString"] as? String ?? "?") (\(info?["CFBundleVersion"] as? String ?? "?"))")
+        version.textColor = .secondaryLabelColor
+        version.isSelectable = true
+        return page([icon, name, version], alignment: .centerX)
+    }
+
+    /// A tab's content: views stacked down the page, inside the window's margins.
+    private static func page(_ views: [NSView], alignment: NSLayoutConstraint.Attribute) -> NSView {
+        let stack = NSStackView(views: views)
+        stack.orientation = .vertical
+        stack.alignment = alignment
+        stack.spacing = 8
+        stack.edgeInsets = NSEdgeInsets(top: margin, left: margin, bottom: margin, right: margin)
+        // Without a fixed width the stack drops its side margins and fits the window to its content.
+        stack.widthAnchor.constraint(equalToConstant: width + margin * 2).isActive = true
+        return stack
+    }
+
+    private static func tab(_ label: String, symbol: String, view: NSView) -> NSTabViewItem {
+        let controller = NSViewController()
+        controller.title = label
+        controller.view = view
+        let item = NSTabViewItem(viewController: controller)
+        item.label = label
+        item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: label)
+        return item
     }
 
     /// A label on the left and its control on the right.
@@ -208,5 +251,21 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
 
     func windowWillClose(_ notification: Notification) {
         onClose()
+    }
+}
+
+/// Fits the window to each tab, keeping its top edge in place. The stock controller leaves the window at its
+/// default size.
+private final class FittingTabViewController: NSTabViewController {
+    override func tabView(_ tabView: NSTabView, didSelect item: NSTabViewItem?) {
+        super.tabView(tabView, didSelect: item)
+        fitWindow()
+    }
+
+    func fitWindow() {
+        guard let content = tabView.selectedTabViewItem?.view, let window = content.window else { return }
+        let size = window.frameRect(forContentRect: CGRect(origin: .zero, size: content.fittingSize)).size
+        window.setFrame(CGRect(x: window.frame.minX, y: window.frame.maxY - size.height, width: size.width, height: size.height),
+                        display: true, animate: window.isVisible)
     }
 }
