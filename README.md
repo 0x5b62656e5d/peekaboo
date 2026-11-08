@@ -31,9 +31,12 @@
 
 peekaboo needs **macOS 27** or later.
 
+> [!NOTE]
+> peekaboo isn't notarized by Apple, so macOS may block it the first time you open it. Go to **System Settings > Privacy & Security** and click **Open Anyway**.
+
 1. [Download `peekaboo.zip`](https://github.com/0x5b62656e5d/peekaboo/releases/latest/download/peekaboo.zip) and unzip it.
 2. Move `peekaboo.app` into your **Applications** folder. macOS hides the divider for apps run from anywhere else.
-3. Open it. peekaboo isn't notarized by Apple, so the first time macOS may block it. Go to **System Settings > Privacy & Security** and click **Open Anyway**.
+3. Open it.
 4. Allow **Accessibility** when asked. That's how peekaboo sees where your icons are.
 
 ### Permissions
