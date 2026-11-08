@@ -1,15 +1,15 @@
 import Foundation
 
-/// Holds the macOS assertion that limits the menu bar to the allowed apps' items.
+/// Holds the macOS assertion that limits the menu bar to the allowed apps' items and Apple's items that aren't hidden.
 final class MenuBarRestriction {
     private var token: Any?
     private var generation = 0
 
     /// The new assertion starts before the old one ends so the bar doesn't flash.
-    func allow(only bundleIDs: [String], onFailure: @escaping (String) -> Void) {
+    func allow(only bundleIDs: [String], hiding systemItems: Set<SystemItem>, onFailure: @escaping (String) -> Void) {
         generation += 1
         let generation = generation
-        PKBMenuBarRestrictionBegin(bundleIDs) { [weak self] token, error in
+        PKBMenuBarRestrictionBegin(bundleIDs, systemItems.map { $0.rawValue as NSNumber }) { [weak self] token, error in
             guard let self, generation == self.generation else {
                 if let token { PKBMenuBarRestrictionEnd(token) }
                 return

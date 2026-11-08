@@ -14,6 +14,7 @@ static NSError *PKBError(NSString *reason) {
 }
 
 void PKBMenuBarRestrictionBegin(NSArray<NSString *> *allowedBundleIDs,
+                                NSArray<NSNumber *> *hiddenSystemItems,
                                 void (^completion)(id _Nullable, NSError *_Nullable)) {
     void (^finish)(id, NSError *) = ^(id token, NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{ completion(token, error); });
@@ -29,7 +30,9 @@ void PKBMenuBarRestrictionBegin(NSArray<NSString *> *allowedBundleIDs,
     }
 
     NSMutableArray<NSNumber *> *systemItems = [NSMutableArray arrayWithCapacity:PKBSystemItemCount];
-    for (NSInteger i = 0; i < PKBSystemItemCount; i++) [systemItems addObject:@(i)];
+    for (NSInteger i = 0; i < PKBSystemItemCount; i++) {
+        if (![hiddenSystemItems containsObject:@(i)]) [systemItems addObject:@(i)];
+    }
 
     @try {
         id config = ((id (*)(id, SEL, NSArray *, NSArray *))objc_msgSend)([configClass alloc], configInit, systemItems, allowedBundleIDs);

@@ -12,6 +12,12 @@ enum RevealMode: String, CaseIterable {
     }
 }
 
+/// Apple's items that can hide along with the rest. The raw values are macOS's own numbers for them.
+enum SystemItem: Int {
+    case clock = 2
+    case controlCenter = 8
+}
+
 enum DividerState {
     case collapsed, expanded, secondBarOpen
 }
@@ -101,6 +107,11 @@ enum Settings {
         set { defaults.set(Array(newValue), forKey: "hiddenBundleIDs") }
     }
 
+    static var hiddenSystemItems: Set<SystemItem> {
+        get { Set((defaults.array(forKey: "hiddenSystemItems") as? [Int] ?? []).compactMap(SystemItem.init)) }
+        set { defaults.set(newValue.map(\.rawValue), forKey: "hiddenSystemItems") }
+    }
+
     static var autoHidesIcons: Bool {
         get { defaults.bool(forKey: "autoHidesIcons") }
         set { defaults.set(newValue, forKey: "autoHidesIcons") }
@@ -140,6 +151,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     private let glyphPicker = NSPopUpButton()
     private let modePicker = NSPopUpButton()
     private let autoHideSwitch = NSSwitch()
+    private let clockSwitch = NSSwitch()
+    private let controlCenterSwitch = NSSwitch()
     private let delaySlider = NSSlider()
     private let delayLabel = NSTextField(labelWithString: "")
     private lazy var delayRow = Self.row("Hide after", Self.stack([delaySlider, delayLabel]))
@@ -164,6 +177,10 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         modePicker.selectItem(at: RevealMode.allCases.firstIndex(of: Settings.revealMode) ?? 0)
         autoHideSwitch.state = Settings.autoHidesIcons ? .on : .off
         autoHideSwitch.controlSize = .small
+        clockSwitch.state = Settings.hiddenSystemItems.contains(.clock) ? .on : .off
+        clockSwitch.controlSize = .small
+        controlCenterSwitch.state = Settings.hiddenSystemItems.contains(.controlCenter) ? .on : .off
+        controlCenterSwitch.controlSize = .small
         delaySlider.minValue = 0
         delaySlider.maxValue = Self.maxAutoHideDelay
         delaySlider.numberOfTickMarks = Int(Self.maxAutoHideDelay / Self.autoHideDelayStep) + 1
@@ -177,7 +194,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         showDelay()
         for (control, action) in [(loginSwitch, #selector(loginToggled)), (menusSwitch, #selector(menusToggled)),
                                   (glyphPicker, #selector(glyphChanged)), (modePicker, #selector(modeChanged)),
-                                  (autoHideSwitch, #selector(autoHideToggled)), (delaySlider, #selector(delayChanged))] as [(NSControl, Selector)] {
+                                  (autoHideSwitch, #selector(autoHideToggled)), (delaySlider, #selector(delayChanged)),
+                                  (clockSwitch, #selector(systemItemsToggled)), (controlCenterSwitch, #selector(systemItemsToggled))] as [(NSControl, Selector)] {
             control.target = self
             control.action = action
         }
@@ -207,9 +225,11 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
             Self.row("Divider icon", glyphPicker),
             Self.row("Show hidden icons", modePicker),
             Self.stack([Self.row("Hide icons automatically", autoHideSwitch), delayRow], vertical: true),
+            Self.row("Hide the clock", clockSwitch),
+            Self.row("Hide Control Center", controlCenterSwitch),
         ])
         delayRow.isHidden = !Settings.autoHidesIcons
-        let hint = NSTextField(wrappingLabelWithString: "⌘-drag menu bar icons left of the divider to hide them, or right of it to keep them visible. Apple's own icons always stay visible, and an app's icons hide together.")
+        let hint = NSTextField(wrappingLabelWithString: "⌘-drag menu bar icons left of the divider to hide them, or right of it to keep them visible. An app's icons hide together. Apple's own icons stay visible, apart from the clock and Control Center if you hide them.")
         hint.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
         hint.textColor = .secondaryLabelColor
         let page = Self.page([group, hint], alignment: .leading)
@@ -313,6 +333,14 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         Settings.autoHidesIcons = autoHideSwitch.state == .on
         delayRow.isHidden = autoHideSwitch.state == .off
         tabs.fitWindow()
+    }
+
+    @objc private func systemItemsToggled() {
+        var items = Set<SystemItem>()
+        if clockSwitch.state == .on { items.insert(.clock) }
+        if controlCenterSwitch.state == .on { items.insert(.controlCenter) }
+        Settings.hiddenSystemItems = items
+        onChange()
     }
 
     @objc private func delayChanged() {

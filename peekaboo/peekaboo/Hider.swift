@@ -54,7 +54,7 @@ final class Hider: NSObject {
 
         _ = AXIsProcessTrustedWithOptions(["AXTrustedCheckOptionPrompt": true] as CFDictionary)
         PKBAllowCursorHidingInBackground()
-        isCollapsed = !hidden.isEmpty
+        isCollapsed = hasAnythingToHide
         applyRestriction()
         updateIcon()
         if isCollapsed && Settings.revealMode == .secondBar { startIconUpdates(once: true) }
@@ -63,7 +63,12 @@ final class Hider: NSObject {
     func settingsChanged() {
         item.isVisible = true
         closeSecondBar()
+        applyRestriction()
         updateIcon()
+    }
+
+    private var hasAnythingToHide: Bool {
+        !hidden.isEmpty || !Settings.hiddenSystemItems.isEmpty
     }
 
     /// Reads which side of the divider each app is on, then hides the left side. Only valid
@@ -102,13 +107,13 @@ final class Hider: NSObject {
 
     /// Allowing everything except the hidden set means a new app is visible by default.
     @objc private func applyRestriction() {
-        guard isCollapsed, !hidden.isEmpty, lift == nil else { return restriction.end() }
+        guard isCollapsed, hasAnythingToHide, lift == nil else { return restriction.end() }
 
         // The divider must never hide, or the user has no way back. macOS also drops the items of
         // apps outside /Applications while restricted, so peekaboo has to be installed there.
         let running = NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier)
         let allowed = running.filter { !hidden.contains($0) || $0 == peeked?.bundleIdentifier } + [Bundle.main.bundleIdentifier ?? ""]
-        restriction.allow(only: allowed) { [weak self] reason in
+        restriction.allow(only: allowed, hiding: Settings.hiddenSystemItems) { [weak self] reason in
             self?.isCollapsed = false
             self?.updateIcon()
             self?.fail(reason)
