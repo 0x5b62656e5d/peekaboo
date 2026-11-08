@@ -6,6 +6,6 @@ export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Develope
 
 # Building the target rather than a scheme skips Xcode's run-destination lookup, which only logs noise here.
 xcodebuild -project peekaboo/peekaboo.xcodeproj -target peekaboo -configuration Release \
-    SYMROOT="$PWD/build/products" OBJROOT="$PWD/build/intermediates" build -quiet
+    SYMROOT="$PWD/build/products" OBJROOT="$PWD/build/intermediates" build -quiet "$@"
 ditto -c -k --keepParent build/products/Release/peekaboo.app build/peekaboo.zip
 echo "build/peekaboo.zip"
