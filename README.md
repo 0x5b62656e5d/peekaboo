@@ -25,7 +25,7 @@
 - **Work around the notch.** Show hidden icons in a second bar just below the menu bar instead, so they never get lost behind the notch. They stay live, so things like CPU meters keep updating.
 - **Hide them again automatically.** Revealed icons can tuck themselves away after a delay you pick, from instantly to 10 seconds. peekaboo waits while you're using them.
 - **Quiet the app menus.** File, Edit, View and the rest stay hidden until you hover the menu bar. The Apple logo and the app's name always stay.
-- **Make it yours.** Pick a chevron, dot, diamond or line for the divider, and launch peekaboo at login.
+- **Make it yours.** Pick a chevron, dot, diamond or line for the divider, hide the clock and Control Center, and launch peekaboo at login.
 
 ## Install
 
@@ -59,7 +59,7 @@ peekaboo only ever looks at the menu bar, when it launches and while the second 
 These come from how macOS 27 works:
 
 - **Apps hide as a whole.** If an app has several icons, they hide or show together.
-- **Some icons always stay.** Apple's own icons, like the clock, Wi-Fi and Control Center, are always visible.
+- **Most of Apple's icons always stay.** Icons like Wi-Fi and Bluetooth are always visible. The clock and Control Center can hide with the rest if you turn that on in Settings.
 - **Call icons hide too.** While your icons are hidden, macOS also hides the phone call icon. Click the divider to see it.
 - **The recording dot stays on in the second bar.** The second bar takes a fresh look at your icons about once a second while it's open, so the screen recording dot shows until you close it.
 - **Icons that don't fit.** If there's no room for an icon even in the menu bar, the second bar shows that app's icon instead.
