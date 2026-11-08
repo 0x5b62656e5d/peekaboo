@@ -35,9 +35,10 @@ A few quirks come from how macOS 27 works:
 
 - **Apps hide as a whole.** If an app has several icons, they hide or show together.
 - **Some icons always stay.** Apple's own icons, like the clock, Wi-Fi and Control Center, are always visible.
+- **Call icons hide too.** While your icons are hidden, macOS also hides the phone call icon. That's its rule, not peekaboo's. Click the divider to see it.
 - **The recording dot.** The second bar takes a fresh look at your icons about once a second while it's open, so the screen recording dot stays on until you close it.
 - **Icons that don't fit.** If there's no room for an icon even in the menu bar, the second bar shows that app's icon instead.
-- **App menu hiding is a macOS setting.** It's one Apple hasn't documented, and peekaboo just switches it on. It stays on after you quit peekaboo, so turn it off in Settings first if you want your menus back for good.
+- **App menu hiding is a macOS setting.** It's one Apple hasn't documented, and peekaboo switches it on while it runs. Your menus come back when peekaboo quits, even if it's force quit.
 - **Updates can break things.** peekaboo relies on parts of macOS that Apple doesn't officially support, so a macOS update could break hiding. If that happens, all your icons simply stay visible.
 
 ## Something not working?
