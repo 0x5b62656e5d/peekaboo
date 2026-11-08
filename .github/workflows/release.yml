@@ -8,47 +8,10 @@ permissions:
   contents: write
 
 jobs:
-  bump:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: main
-
-      - name: Bump version
-        id: bump
-        run: |
-          project=peekaboo/peekaboo.xcodeproj/project.xcproj
-          version="${GITHUB_REF_NAME#v}"
-          build=$(sed -nE 's/.*"CURRENT_PROJECT_VERSION": "([0-9]+)".*/\1/p' "$project" | head -1)
-          sed -i -E \
-            -e "s/(\"CURRENT_PROJECT_VERSION\": \")[0-9]+/\1$((build + 1))/" \
-            -e "s/(\"MARKETING_VERSION\": \")[^\"]+/\1$version/" \
-            "$project"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - name: Commit
-        id: commit
-        uses: planetscale/ghcommit-action@v0.2.22
-        with:
-          commit_message: "chore: bump version to ${{ steps.bump.outputs.version }}"
-          repo: ${{ github.repository }}
-          branch: main
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-
-      - name: Move the tag to the commit
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh api -X PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/$GITHUB_REF_NAME" -f sha=${{ steps.commit.outputs.commit-hash }} -F force=true
-
   release:
-    needs: bump
     runs-on: xcode-27
     steps:
       - uses: actions/checkout@v5
-        with:
-          ref: ${{ github.ref }}
 
       - name: Import signing certificate
         env:
