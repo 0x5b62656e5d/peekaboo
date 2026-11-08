@@ -9,8 +9,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/0x5b62656e5d/peekaboo/releases/latest"><img src="https://img.shields.io/github/v/release/0x5b62656e5d/peekaboo" alt="Latest version"></a>
-  <img src="https://img.shields.io/badge/macOS-27%2B-blue" alt="Requires macOS 27 or later">
+  <a href="https://github.com/0x5b62656e5d/peekaboo/releases/latest"><img src="https://img.shields.io/github/v/release/0x5b62656e5d/peekaboo?style=for-the-badge&labelColor=333&color=FFB627" alt="Latest version"></a>
+  <img src="https://img.shields.io/badge/macOS-27%2B-blue?style=for-the-badge&labelColor=333&color=FFB627" alt="Requires macOS 27 or later">
 </p>
 
 <p align="center">
