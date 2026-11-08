@@ -58,8 +58,17 @@ enum Settings {
         set { defaults.set(newValue.rawValue, forKey: "glyph") }
     }
 
-    /// A system setting, so it stays after peekaboo quits.
+    /// peekaboo's own copy of the choice. macOS's setting only follows it while peekaboo runs.
     static var hidesAppMenus: Bool {
+        get { defaults.bool(forKey: "hidesAppMenus") }
+        set {
+            defaults.set(newValue, forKey: "hidesAppMenus")
+            menusOnHover = newValue
+            if newValue { _ = menusOffOnExit }
+        }
+    }
+
+    private static var menusOnHover: Bool {
         get { CFPreferencesCopyValue(menusOnHoverKey, kCFPreferencesAnyApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost) as? Bool ?? false }
         set {
             CFPreferencesSetValue(menusOnHoverKey, newValue as CFBoolean, kCFPreferencesAnyApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost)
@@ -67,10 +76,24 @@ enum Settings {
         }
     }
 
-    /// peekaboo used to fade the menus itself, on by default. This carries that choice over to macOS's setting once.
+    /// Turns macOS's setting off once peekaboo exits, even on a force quit or crash: the kernel
+    /// closes peekaboo's end of the pipe however it dies, and that ends the shell's read.
+    private static let menusOffOnExit: Process = {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", "read _; /usr/bin/defaults write -g \(menusOnHoverKey) -bool false"]
+        process.standardInput = Pipe()
+        try? process.run()
+        return process
+    }()
+
+    /// Earlier versions kept the choice as fadesAppMenus, then only in macOS's setting.
     static func adoptMenuHiding(isFirstLaunch: Bool) {
-        if defaults.object(forKey: "fadesAppMenus") as? Bool ?? isFirstLaunch { hidesAppMenus = true }
+        let saved = defaults.object(forKey: "hidesAppMenus") ?? defaults.object(forKey: "fadesAppMenus")
         defaults.removeObject(forKey: "fadesAppMenus")
+        let hides = saved as? Bool ?? (menusOnHover || isFirstLaunch)
+        defaults.set(hides, forKey: "hidesAppMenus")
+        if hides { hidesAppMenus = true }
     }
 
     static var hiddenBundleIDs: Set<String> {
