@@ -3,6 +3,7 @@ import AppKit
 @main
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hider = Hider()
+    private let updater = Updater()
     private var settingsWindow: SettingsWindow?
 
     static func main() {
@@ -18,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Settings.adoptMenuHiding(isFirstLaunch: isFirstLaunch)
         hider.start()
         if isFirstLaunch { showSettings() }
+        updater.start()
     }
 
     /// Opening the app again is the way back if the divider ever goes missing.

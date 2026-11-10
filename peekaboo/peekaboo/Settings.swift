@@ -123,6 +123,22 @@ enum Settings {
         set { defaults.set(newValue, forKey: "autoHideDelay") }
     }
 
+    static var checksForUpdates: Bool {
+        get { defaults.object(forKey: "checksForUpdates") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: "checksForUpdates") }
+    }
+
+    /// A version the user chose to skip. Automatic checks don't offer it again.
+    static var skippedVersion: String? {
+        get { defaults.string(forKey: "skippedVersion") }
+        set { defaults.set(newValue, forKey: "skippedVersion") }
+    }
+
+    static var lastUpdateCheck: Date? {
+        get { defaults.object(forKey: "lastUpdateCheck") as? Date }
+        set { defaults.set(newValue, forKey: "lastUpdateCheck") }
+    }
+
     static func isFirstLaunch() -> Bool {
         defer { defaults.set(true, forKey: "hasLaunched") }
         return !defaults.bool(forKey: "hasLaunched")
