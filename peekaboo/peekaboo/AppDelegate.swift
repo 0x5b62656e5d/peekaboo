@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = makeMainMenu()
         hider.onOpenSettings = { [weak self] in self?.showSettings() }
+        hider.onCheckForUpdates = { [weak self] in self?.updater.checkForUpdates() }
         let isFirstLaunch = Settings.isFirstLaunch()
         Settings.adoptMenuHiding(isFirstLaunch: isFirstLaunch)
         hider.start()
@@ -39,7 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func openSettings(_ tab: SettingsWindow.Tab) {
         if settingsWindow == nil {
-            settingsWindow = SettingsWindow(onChange: { [weak self] in
+            settingsWindow = SettingsWindow(updater: updater, onChange: { [weak self] in
                 self?.hider.settingsChanged()
             }, onClose: { [weak self] in
                 self?.settingsWindow = nil
@@ -52,6 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func makeMainMenu() -> NSMenu {
         let appMenu = NSMenu(title: "peekaboo")
         appMenu.addItem(withTitle: "About peekaboo", action: #selector(showAbout), keyEquivalent: "")
+        appMenu.addItem(withTitle: "Check for Updates…", action: #selector(Updater.checkForUpdates), keyEquivalent: "").target = updater
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
         appMenu.addItem(.separator())

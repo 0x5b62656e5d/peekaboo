@@ -163,6 +163,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     private let onChange: () -> Void
     private let onClose: () -> Void
     private let loginSwitch = NSSwitch()
+    private let updatesSwitch = NSSwitch()
     private let menusSwitch = NSSwitch()
     private let glyphPicker = NSPopUpButton()
     private let modePicker = NSPopUpButton()
@@ -173,7 +174,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     private let delayLabel = NSTextField(labelWithString: "")
     private lazy var delayRow = Self.row("Hide after", Self.stack([delaySlider, delayLabel]))
 
-    init(onChange: @escaping () -> Void, onClose: @escaping () -> Void) {
+    init(updater: Updater, onChange: @escaping () -> Void, onClose: @escaping () -> Void) {
         self.onChange = onChange
         self.onClose = onClose
         tabs.tabStyle = .toolbar
@@ -186,6 +187,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         loginSwitch.state = SMAppService.mainApp.status == .enabled ? .on : .off
         menusSwitch.state = Settings.hidesAppMenus ? .on : .off
         loginSwitch.controlSize = .small
+        updatesSwitch.state = Settings.checksForUpdates ? .on : .off
+        updatesSwitch.controlSize = .small
         menusSwitch.controlSize = .small
         glyphPicker.addItems(withTitles: DividerGlyph.allCases.map(\.title))
         glyphPicker.selectItem(at: DividerGlyph.allCases.firstIndex(of: Settings.glyph) ?? 0)
@@ -208,7 +211,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         delayLabel.font = .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         delayLabel.textColor = .secondaryLabelColor
         showDelay()
-        for (control, action) in [(loginSwitch, #selector(loginToggled)), (menusSwitch, #selector(menusToggled)),
+        for (control, action) in [(loginSwitch, #selector(loginToggled)), (updatesSwitch, #selector(updatesToggled)), (menusSwitch, #selector(menusToggled)),
                                   (glyphPicker, #selector(glyphChanged)), (modePicker, #selector(modeChanged)),
                                   (autoHideSwitch, #selector(autoHideToggled)), (delaySlider, #selector(delayChanged)),
                                   (clockSwitch, #selector(systemItemsToggled)), (controlCenterSwitch, #selector(systemItemsToggled))] as [(NSControl, Selector)] {
@@ -217,7 +220,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         }
 
         tabs.addTabViewItem(Self.tab("General", symbol: "gearshape", view: makeGeneral()))
-        tabs.addTabViewItem(Self.tab("About", symbol: "info.circle", view: Self.makeAbout()))
+        tabs.addTabViewItem(Self.tab("About", symbol: "info.circle", view: Self.makeAbout(updater: updater)))
         window.center()
     }
 
@@ -237,6 +240,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     private func makeGeneral() -> NSView {
         let group = Self.group([
             Self.row("Launch at login", loginSwitch),
+            Self.row("Check for updates automatically", updatesSwitch),
             Self.row("Hide app menus until hovered", menusSwitch),
             Self.row("Divider icon", glyphPicker),
             Self.row("Show hidden icons", modePicker),
@@ -254,8 +258,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         return page
     }
 
-    /// The app's icon, name and version as x.y.z (build).
-    private static func makeAbout() -> NSView {
+    /// The app's icon, name and version as x.y.z (build), with a button to check for a newer one.
+    private static func makeAbout(updater: Updater) -> NSView {
         // NSApp.applicationIconImage can hold on to a stale placeholder, so ask for the icon Finder shows.
         let icon = NSImageView(image: NSWorkspace.shared.icon(forFile: Bundle.main.bundlePath))
         icon.imageScaling = .scaleProportionallyUpOrDown
@@ -267,11 +271,14 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         let version = NSTextField(labelWithString: "Version \(info?["CFBundleShortVersionString"] as? String ?? "?") (\(info?["CFBundleVersion"] as? String ?? "?"))")
         version.textColor = .secondaryLabelColor
         version.isSelectable = true
-        return page([icon, name, version], alignment: .centerX)
+        let update = NSButton(title: "Check for Updates…", target: updater, action: #selector(Updater.checkForUpdates))
+        let about = page([icon, name, version, update], alignment: .centerX)
+        about.setCustomSpacing(16, after: version)
+        return about
     }
 
     /// A tab's content: views stacked down the page, inside the window's margins.
-    private static func page(_ views: [NSView], alignment: NSLayoutConstraint.Attribute) -> NSView {
+    private static func page(_ views: [NSView], alignment: NSLayoutConstraint.Attribute) -> NSStackView {
         let stack = NSStackView(views: views)
         stack.orientation = .vertical
         stack.alignment = alignment
@@ -366,6 +373,10 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
 
     private func showDelay() {
         delayLabel.stringValue = String(format: "%.1fs", delaySlider.doubleValue)
+    }
+
+    @objc private func updatesToggled() {
+        Settings.checksForUpdates = updatesSwitch.state == .on
     }
 
     @objc private func menusToggled() {

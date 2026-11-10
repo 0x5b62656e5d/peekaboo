@@ -40,6 +40,7 @@ final class Hider: NSObject {
     private var secondBarDisplay: CGRect?
 
     var onOpenSettings: (() -> Void)?
+    var onCheckForUpdates: (() -> Void)?
 
     func start() {
         item.autosaveName = "peekaboo.divider"
@@ -263,6 +264,10 @@ final class Hider: NSObject {
         onOpenSettings?()
     }
 
+    @objc private func checkForUpdates() {
+        onCheckForUpdates?()
+    }
+
     @objc private func clicked() {
         guard NSApp.currentEvent?.type == .rightMouseUp else {
             if isCollapsed && Settings.revealMode == .secondBar {
@@ -283,6 +288,7 @@ final class Hider: NSObject {
         if isCollapsed {
             menu.addItem(withTitle: "Arrange Icons", action: #selector(expand), keyEquivalent: "").target = self
         }
+        menu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: "").target = self
         menu.addItem(withTitle: "Quit peekaboo", action: #selector(NSApplication.terminate), keyEquivalent: "")
         item.menu = menu
