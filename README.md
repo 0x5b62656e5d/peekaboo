@@ -32,7 +32,7 @@
 peekaboo needs **macOS 27** or later.
 
 > [!NOTE]
-> peekaboo isn't notarized by Apple, so macOS may block it the first time you open it. Go to **System Settings > Privacy & Security** and click **Open Anyway**.
+> peekaboo isn't notarized by Apple, so macOS may block it the first time you open it. Go to **System Settings > Privacy & Security** and click **Open Anyway**. You only need to do this once, since peekaboo installs its own updates.
 
 1. [Download `peekaboo.zip`](https://github.com/0x5b62656e5d/peekaboo/releases/latest/download/peekaboo.zip) and unzip it.
 2. Move `peekaboo.app` into your **Applications** folder. macOS hides the divider for apps run from anywhere else.
@@ -53,6 +53,7 @@ peekaboo only ever looks at the menu bar, when it launches and while the second 
 - **Choose what hides:** hold ⌘ and drag icons to the left of the divider to hide them, or to its right to keep them visible.
 - **Show or hide:** click the divider.
 - **Settings:** right-click the divider and pick **Settings…**.
+- **Updates:** peekaboo checks once a day and asks before installing. Right-click the divider and pick **Check for Updates…** to check now.
 
 ## Known limitations
 
