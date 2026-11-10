@@ -95,7 +95,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSAlert(error: error).runModal()
             return
         }
-        // The new copy starts once this one has quit, so it doesn't inherit anything from it.
+        Self.relaunch()
+    }
+
+    /// Quits and opens whatever is at this app's path. The new copy starts once this one has quit, so it
+    /// doesn't inherit anything from it.
+    static func relaunch() {
         let reopen = Process()
         reopen.executableURL = URL(fileURLWithPath: "/bin/sh")
         reopen.arguments = ["-c", "sleep 1; /usr/bin/open \"$0\"", Bundle.main.bundlePath]
