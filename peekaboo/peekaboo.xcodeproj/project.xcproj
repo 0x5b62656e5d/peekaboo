@@ -12,8 +12,11 @@
   },
   "packages": [
     {
-      "kind": "local",
-      "path": "../../Truss",
+      "kind": "remote",
+      "repository": "https://github.com/0x5b62656e5d/Truss",
+      "version": {
+        "up-to-next-minor-version": "0.1.0",
+      },
     },
   ],
   "files": [

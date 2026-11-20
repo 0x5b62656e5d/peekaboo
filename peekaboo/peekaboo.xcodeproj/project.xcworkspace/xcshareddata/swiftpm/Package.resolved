@@ -1,0 +1,15 @@
+{
+  "originHash" : "87ec58ce77588af083f5f69e3b75111ba09abebd25736741f7042cdb6fb6f743",
+  "pins" : [
+    {
+      "identity" : "truss",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/0x5b62656e5d/Truss",
+      "state" : {
+        "revision" : "6a650dfee3bb2a571202a9953ba0b21dc6888330",
+        "version" : "0.1.1"
+      }
+    }
+  ],
+  "version" : 3
+}
