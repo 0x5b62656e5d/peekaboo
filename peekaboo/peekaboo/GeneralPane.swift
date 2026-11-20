@@ -32,7 +32,9 @@ private struct GeneralSections: View {
             Toggle("Hide app menus until hovered", isOn: $hidesAppMenus)
 
             Picker("Divider icon", selection: $glyph) {
-                ForEach(DividerGlyph.allCases, id: \.self) { Text($0.title) }
+                ForEach(DividerGlyph.allCases, id: \.self) { glyph in
+                    Label(glyph.title, systemImage: glyph.symbol(for: .collapsed))
+                }
             }
 
             Picker("Show hidden icons", selection: $revealMode) {
