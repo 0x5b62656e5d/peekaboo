@@ -1,9 +1,10 @@
 import AppKit
+import Truss
 
 @main
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hider = Hider()
-    private let updater = Updater()
+    private let updater = Updater(repo: "0x5b62656e5d/peekaboo")
     private var settingsWindow: SettingsWindow?
 
     static func main() {
@@ -99,16 +100,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSAlert(error: error).runModal()
             return
         }
-        Self.relaunch()
-    }
-
-    /// Quits and opens whatever is at this app's path. The new copy starts once this one has quit, so it
-    /// doesn't inherit anything from it.
-    static func relaunch() {
-        let reopen = Process()
-        reopen.executableURL = URL(fileURLWithPath: "/bin/sh")
-        reopen.arguments = ["-c", "sleep 1; /usr/bin/open \"$0\"", Bundle.main.bundlePath]
-        try? reopen.run()
-        NSApp.terminate(nil)
+        NSApp.relaunch()
     }
 }
