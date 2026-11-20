@@ -10,6 +10,12 @@
       "Base",
     ],
   },
+  "packages": [
+    {
+      "kind": "local",
+      "path": "../../Truss",
+    },
+  ],
   "files": [
     { "kind": "folder", "path": "peekaboo", "target-membership": [ "peekaboo" ] },
     {
@@ -30,6 +36,13 @@
         "compile-sources",
         "frameworks",
         "resources",
+      ],
+      "package-product-members": [
+        {
+          "package": "Truss",
+          "product-name": "Truss",
+          "build-phase": { "build-phase": "frameworks" },
+        },
       ],
       "build-settings": {
         "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
