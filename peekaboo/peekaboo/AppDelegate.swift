@@ -5,7 +5,7 @@ import Truss
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let hider = Hider()
     private let updater = Updater(repo: "0x5b62656e5d/peekaboo")
-    private var settingsWindow: SettingsWindow?
+    private lazy var settingsWindow = SettingsWindow(panes: [.general(onChange: hider.settingsChanged), .about(updater: updater)])
 
     static func main() {
         let delegate = AppDelegate()
@@ -32,22 +32,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func showSettings() {
-        openSettings(.general)
+        settingsWindow.show("General")
     }
 
     @objc private func showAbout() {
-        openSettings(.about)
-    }
-
-    private func openSettings(_ tab: SettingsWindow.Tab) {
-        if settingsWindow == nil {
-            settingsWindow = SettingsWindow(updater: updater, onChange: { [weak self] in
-                self?.hider.settingsChanged()
-            }, onClose: { [weak self] in
-                self?.settingsWindow = nil
-            })
-        }
-        settingsWindow?.show(tab)
+        settingsWindow.show("About")
     }
 
     /// Shown while a peekaboo window is in front. There's no Dock icon, so it's the only place for these.
